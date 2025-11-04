@@ -1,3 +1,5 @@
+import os
+
 # Task settings
 SUBTASK = "subtask_1"
 TASK = "task1"
@@ -12,6 +14,7 @@ LEARNING_RATE = 1e-5
 EPOCHS = 5
 BATCH_SIZE = 64
 MAX_LEN = 128
+PATIENCE = 2
 
 #Data file paths
 DATA_ROOT = "task-dataset"
@@ -23,7 +26,11 @@ TRAIN_FILE = f"{DATA_DIR}/{LANG}_{DOMAIN}_train_alltasks.jsonl"
 PREDICT_FILE = f"{DATA_DIR}/{LANG}_{DOMAIN}_dev_{TASK}.jsonl"
 
 # Output settings
-OUTPUT_DIR = "predictions"
-OUTPUT_FILE = f"{OUTPUT_DIR}/{SUBTASK}/pred_{LANG}_{DOMAIN}.jsonl"
+MODEL_SAVE_DIR = "models"
+PREDICTION_DIR = "predictions"
 
+
+PREDICTION_FILE = f"{PREDICTION_DIR}/{SUBTASK}/pred_{LANG}_{DOMAIN}.jsonl"
+
+MODEL_SAVE_PATH = os.path.join(MODEL_SAVE_DIR, SUBTASK, "best_model.pt")
 

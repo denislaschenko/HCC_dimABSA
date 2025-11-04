@@ -6,11 +6,10 @@ from torch.utils.data import DataLoader
 from transformers import AutoTokenizer, get_linear_schedule_with_warmup
 from torch.optim import AdamW
 from sklearn.model_selection import train_test_split
-import pandas as pd
-import numpy as np
 
 project_root = os.path.abspath(os.path.dirname(__file__))
-sys.path.insert(0, project_root)
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
 from src.subtask_1 import config
 from src.shared import utils
@@ -53,7 +52,7 @@ def main():
 
     model = TransformerVARegressor(model_name=config.MODEL_NAME).to(device)
 
-    optimizer = AdamW(model.parameters(), lr=config.LR)
+    optimizer = AdamW(model.parameters(), lr=config.LEARNING_RATE)
     loss_fn = nn.MSELoss()
 
     num_training_steps = len(train_loader) * config.EPOCHS
@@ -93,11 +92,11 @@ def main():
 
     print("--- Training Finished ---")
 
-    # --- Evaluation ---
+
     print("Loading best model for evaluation...")
     model.load_state_dict(torch.load(config.MODEL_SAVE_PATH))
 
-    pred_v, pred_a, gold_v, gold_a = utils.get_prd(model, dev_loader, device, type="dev")
+    pred_v, pred_a, gold_v, gold_a = utils.get_predictions(model, dev_loader, device, type="dev")
     eval_score = utils.evaluate_predictions_task1(pred_a, pred_v, gold_a, gold_v)
 
     print(f"\n--- Dev Set Evaluation ---")
@@ -108,7 +107,7 @@ def main():
 
     # --- Prediction ---
     print("Running predictions on the test set...")
-    pred_v, pred_a = utils.get_prd(model, predict_loader, device, type="pred")
+    pred_v, pred_a = utils.get_predictions(model, predict_loader, device, type="pred")
 
     predict_df["Valence"] = pred_v
     predict_df["Arousal"] = pred_a
