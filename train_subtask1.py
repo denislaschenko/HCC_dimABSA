@@ -18,6 +18,7 @@ from src.subtask_1.model import TransformerVARegressor
 
 
 def main():
+    utils.set_seed(42)
 
     print(f"Using model: {config.MODEL_NAME}")
     print(f"Loading tokenizer...")
