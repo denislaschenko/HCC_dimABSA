@@ -1,7 +1,13 @@
 # HCC_dimABSA
 Exploring Aspect-based sentiment analysis with continuous emotion scores (Valence &amp; Arousal) – Bachelor-level implementation of SemEval2026.
 
-## 📊 Experiment Log & Results
+## Model Performance Progress
+
+This chart shows the performance improvement on the **dev set** over time.
+
+![Model Performance Progress](performance_plot.png)
+
+## Experiment Log & Results
 
 This table tracks the performance of each model version on the **dev set**.
 
@@ -9,3 +15,4 @@ This table tracks the performance of each model version on the **dev set**.
 | :--- | :--- | :--- | :---: | :---: | :---: | :--- |
 | 24.10.25 | v1.0 | `bert-base-multilingual-cased` | 0.581 | 0.435 | 2.216 | Initial run. |
 | 04.11.25 | v1.1 | `bert-base-multilingual-cased` | **0.809** | **0.640** | **1.381** | **Fixed tokenizer mismatch.** |
+
