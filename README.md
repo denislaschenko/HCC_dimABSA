@@ -5,7 +5,7 @@ Exploring Aspect-based sentiment analysis with continuous emotion scores (Valenc
 
 This chart shows the performance improvement on the **dev set** over time.
 
-![Model Performance Progress](performance_plot.png)
+![Model Performance Progress](progress-visualization/performance_plot.png)
 
 ## Experiment Log & Results
 
