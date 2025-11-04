@@ -1,15 +1,16 @@
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
-from transformers import AutoTokenizer, AdamW, get_linear_schedule_with_warmup
+from transformers import AutoTokenizer, get_linear_schedule_with_warmup
+from torch.optim import AdamW
 from sklearn.model_selection import train_test_split
 import numpy as np
 import copy
 
 import config
 import utils
-from dataset import VADataset
-from model import TransformerVARegressor
+from src.subtask_1.dataset import VADataset
+from src.subtask_1.model import TransformerVARegressor
 
 
 def run():
