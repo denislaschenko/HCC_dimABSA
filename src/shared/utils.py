@@ -8,13 +8,15 @@ import torch
 from typing import List, Dict
 from scipy.stats import pearsonr
 
-def load_jsonl_url(url: str) -> List[Dict]:
+def load_jsonl(filepath: str) -> List[Dict]:
     try:
-        resp = requests.get(url)
-        resp.raise_for_status()
-        return [json.loads(line) for line in resp.text.splitlines()]
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching data from {url}: {e}")
+        with open(filepath, "r", encoding="utf-8") as f:
+            return [json.loads(line) for line in f]
+    except FileNotFoundError:
+        print(f"Error: Data file not found at {filepath}")
+        return []
+    except json.JSONDecodeError:
+        print(f"Error: Could not decode JSON in file: {filepath}")
         return []
 
 def jsonl_to_df(data: List[Dict]) -> pd.DataFrame:
