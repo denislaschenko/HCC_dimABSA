@@ -1,0 +1,29 @@
+# Task settings
+SUBTASK = "subtask_1"
+TASK = "task1"
+LANG = "eng"
+DOMAIN = "laptop"
+
+# Model settings
+MODEL_NAME = "bert-base-multilingual-cased"
+
+# Training settings
+LEARNING_RATE = 1e-5
+EPOCHS = 5
+BATCH_SIZE = 64
+MAX_LEN = 128
+
+#Data file paths
+DATA_ROOT = "task-dataset"
+TRACK = "track_a"
+
+# Data file Path Constructor
+DATA_DIR = f"{DATA_ROOT}/{TRACK}/{SUBTASK}/{LANG}"
+TRAIN_FILE = f"{DATA_DIR}/{LANG}_{DOMAIN}_train_alltasks.jsonl"
+PREDICT_FILE = f"{DATA_DIR}/{LANG}_{DOMAIN}_dev_{TASK}.jsonl"
+
+# Output settings
+OUTPUT_DIR = "predictions"
+OUTPUT_FILE = f"{OUTPUT_DIR}/{SUBTASK}/pred_{LANG}_{DOMAIN}.jsonl"
+
+
