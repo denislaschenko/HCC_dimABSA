@@ -73,7 +73,7 @@ def main():
     for epoch in range(config.EPOCHS):
         print(f"\nEpoch {epoch + 1}/{config.EPOCHS}")
 
-        train_loss = model.train_epoch(train_loader, optimizer, scheduler, loss_fn, device)
+        train_loss = model.train_epoch(train_loader, optimizer, scheduler, device, loss_fn)
         val_loss = model.eval_epoch(dev_loader, loss_fn, device)
 
         print(f"Train Loss: {train_loss:.4f} | Val Loss: {val_loss:.4f}")
