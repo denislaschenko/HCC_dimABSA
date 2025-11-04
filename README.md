@@ -7,5 +7,5 @@ This table tracks the performance of each model version on the **dev set**.
 
 | Date | Experiment | Model | PCC_V (↑) | PCC_A (↑) | RMSE_VA (↓) | Notes |
 | :--- | :--- | :--- | :---: | :---: | :---: | :--- |
-| 11/03/25 | v1.0 | `bert-base-multilingual-cased` | 0.581 | 0.435 | 2.216 | Initial run. |
-| 11/04/25 | v1.1 | `bert-base-multilingual-cased` | **0.809** | **0.640** | **1.381** | **Fixed tokenizer mismatch.** |
+| 24.10.25 | v1.0 | `bert-base-multilingual-cased` | 0.581 | 0.435 | 2.216 | Initial run. |
+| 04.11.25 | v1.1 | `bert-base-multilingual-cased` | **0.809** | **0.640** | **1.381** | **Fixed tokenizer mismatch.** |
