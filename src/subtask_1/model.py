@@ -16,7 +16,7 @@ class TransformerVARegressor(nn.Module):
         x = self.dropout(cls_output)
         return self.reg_head(x)
 
-    def train_epoch(self, dataloader, optimizer, loss_fn, device, scheduler):
+    def train_epoch(self, dataloader, optimizer, scheduler, device, loss_fn):
         self.train()
         total_loss = 0
         for batch in tqdm(dataloader, desc="Training Epoch"):
