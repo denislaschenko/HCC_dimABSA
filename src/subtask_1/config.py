@@ -7,11 +7,11 @@ LANG = "eng"
 DOMAIN = "laptop"
 
 # Model settings
-MODEL_NAME = 'bert-base-cased'
+MODEL_NAME = "bert-base-multilingual-cased"
 
 # Training settings
 LEARNING_RATE = 1e-5
-EPOCHS = 5
+EPOCHS = 20
 BATCH_SIZE = 64
 MAX_LEN = 128
 PATIENCE = 2
