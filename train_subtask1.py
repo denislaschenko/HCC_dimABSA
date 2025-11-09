@@ -15,6 +15,7 @@ from src.subtask_1 import config
 from src.shared import utils
 from src.subtask_1.dataset import VADataset
 from src.subtask_1.model import TransformerVARegressor
+# from src.subtask_1.progress_visualization.generate_results_plot import generate_results_plot
 
 
 def main():
@@ -114,6 +115,8 @@ def main():
     predict_df["Arousal"] = pred_a
 
     os.makedirs(os.path.dirname(config.PREDICTION_FILE), exist_ok=True)
+
+    generate_results_plot()
 
     utils.df_to_jsonl(predict_df, config.PREDICTION_FILE)
     print(f"Predictions saved to {config.PREDICTION_FILE}")
