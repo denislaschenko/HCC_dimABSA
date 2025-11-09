@@ -135,7 +135,7 @@ def log_results_to_csv(csv_path: str, results: dict):
     try:
         row_data = [
             results['date'],
-            results['version'],
+            results['experiment'],
             results['model'],
             f"{results['pcc_v']:.4f}",
             f"{results['pcc_a']:.4f}",
@@ -148,10 +148,10 @@ def log_results_to_csv(csv_path: str, results: dict):
 
             writer.writerow(row_data)
 
-        print(f"Ergebnisse erfolgreich in {csv_path} angehängt.")
+        print(f"successfully appended results to {csv_path}.")
 
     except IOError as e:
-        print(f"Fehler beim Anhängen an CSV-Datei unter {csv_path}: {e}")
+        print(f"error appending results to {csv_path}: {e}")
 
     except KeyError as e:
-        print(f"Fehler: Der Schlüssel {e} wurde in den Ergebnisdaten nicht gefunden. Nichts wurde protokolliert.")
+        print(f"ERROR: the key {e} could not be found, nothing has been appended.")

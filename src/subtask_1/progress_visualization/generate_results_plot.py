@@ -41,7 +41,7 @@ def generate_plot():
 
     try:
         plt.savefig(OUTPUT_FILE)
-        print(f"Successfully generated and saved plot to: {OUTPUT_FILE}")
+        print(f"Successfully generated and saved plot from CSV to: {OUTPUT_FILE}")
     except Exception as e:
         print(f"Error saving plot: {e}")
 
