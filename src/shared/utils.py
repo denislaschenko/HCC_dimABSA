@@ -1,3 +1,4 @@
+import csv
 import json
 import random
 import re
@@ -129,3 +130,28 @@ def set_seed(seed: int):
         torch.cuda.manual_seed_all(seed)
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
+
+def log_results_to_csv(csv_path: str, results: dict):
+    try:
+        row_data = [
+            results['date'],
+            results['version'],
+            results['model'],
+            f"{results['pcc_v']:.4f}",
+            f"{results['pcc_a']:.4f}",
+            f"{results['rmse_va']:.4f}"
+        ]
+
+        with open(csv_path, 'a', newline='', encoding='utf-8') as f:
+            writer = csv.writer(f)
+
+
+            writer.writerow(row_data)
+
+        print(f"Ergebnisse erfolgreich in {csv_path} angehängt.")
+
+    except IOError as e:
+        print(f"Fehler beim Anhängen an CSV-Datei unter {csv_path}: {e}")
+
+    except KeyError as e:
+        print(f"Fehler: Der Schlüssel {e} wurde in den Ergebnisdaten nicht gefunden. Nichts wurde protokolliert.")

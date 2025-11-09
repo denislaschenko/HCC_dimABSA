@@ -8,6 +8,7 @@ DOMAIN = "laptop"
 
 # Model settings
 MODEL_NAME = "roberta-base"
+MODEL_VERSION_ID = "v1.3"
 
 # Training settings
 LEARNING_RATE = 1e-5

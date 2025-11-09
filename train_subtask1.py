@@ -1,5 +1,7 @@
 import sys
 import os
+
+import pandas as pd
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
@@ -15,12 +17,11 @@ from src.subtask_1 import config
 from src.shared import utils
 from src.subtask_1.dataset import VADataset
 from src.subtask_1.model import TransformerVARegressor
-# from src.subtask_1.progress_visualization.generate_results_plot import generate_results_plot
-
-#
+from src.subtask_1.progress_visualization.generate_results_plot import generate_plot
 
 
 def main():
+    version = 3
     utils.set_seed(42)
 
     print(f"Using model: {config.MODEL_NAME}")
@@ -109,7 +110,6 @@ def main():
     print(f"RMSE_VA: {eval_score['RMSE_VA']:.4f}")
     print("--------------------------")
 
-    # --- Prediction ---
     print("Running predictions on the test set...")
     pred_v, pred_a = utils.get_predictions(model, predict_loader, device, type="pred")
 
@@ -118,7 +118,18 @@ def main():
 
     os.makedirs(os.path.dirname(config.PREDICTION_FILE), exist_ok=True)
 
-    generate_results_plot()
+    print("\n--- Protokollierung der Ergebnisse ---")
+    results_data = {
+        'date': pd.Timestamp.now().strftime('%Y-%m-%d'),
+        'experiment': config.MODEL_VERSION_ID,
+        'model': config.MODEL_NAME,
+        'pcc_v': eval_score['PCC_V'],
+        'pcc_a': eval_score['PCC_A'],
+        'rmse_va': eval_score['RMSE_VA']
+    }
+
+    utils.log_results_to_csv("src/subtask_1/progress_visualization/results.csv", results_data)
+    generate_plot()
 
     utils.df_to_jsonl(predict_df, config.PREDICTION_FILE)
     print(f"Predictions saved to {config.PREDICTION_FILE}")
