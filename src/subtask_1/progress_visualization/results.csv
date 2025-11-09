@@ -2,3 +2,4 @@ date,experiment,model,pcc_v,pcc_a,rmse_va
 2025-10-24,v1.0,bert-multi,0.581,0.435,2.216
 2025-11-04,v1.1,bert-multi,0.809,0.640,1.381
 2025-11-09,v1.2,bert-multi,0.8119,0.6567,1.5626
+2025-11-09,v1.3,roberta-base,0.8873,0.7059,1.5504
