@@ -7,7 +7,7 @@ LANG = "eng"
 DOMAIN = "laptop"
 
 # Model settings
-MODEL_NAME = "bert-base-multilingual-cased"
+MODEL_NAME = 'bert-base-cased'
 
 # Training settings
 LEARNING_RATE = 1e-5
