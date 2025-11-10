@@ -122,6 +122,7 @@ def main():
     # -----------------------------------------------------------------
     # Training loop
     # -----------------------------------------------------------------
+    """
     logger.info("--- Starting Training ---")
     for epoch in range(args.epochs):
         logger.info(f"Epoch {epoch + 1}/{args.epochs}")
@@ -143,6 +144,35 @@ def main():
             break
 
     logger.info("--- Training Finished ---")
+    """
+    train_losses, val_losses = [], []
+    logger.info("--- Starting Training ---")
+    for epoch in range(args.epochs):
+        logger.info(f"Epoch {epoch + 1}/{args.epochs}")
+
+        train_loss = model.train_epoch(train_loader, optimizer, scheduler, device, loss_fn)
+        val_loss = model.eval_epoch(dev_loader, loss_fn, device)
+
+        train_losses.append(train_loss)
+        val_losses.append(val_loss)
+
+        logger.info(f"Train Loss: {train_loss:.4f} | Val Loss: {val_loss:.4f}")
+
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+            torch.save({"model_state": model.state_dict(), "epoch": epoch}, checkpoint_path)
+            logger.info(f"Model checkpoint saved: {checkpoint_path}")
+            epochs_no_improve = 0
+        else:
+            epochs_no_improve += 1
+
+        if epochs_no_improve >= args.patience:
+            logger.info("Early stopping triggered.")
+            break
+    logger.info("--- Training Finished ---")
+    # --- After training ---
+    plot_training_curves(train_losses, val_losses, args.output_dir)
+
 
     # -----------------------------------------------------------------
     # Evaluation
