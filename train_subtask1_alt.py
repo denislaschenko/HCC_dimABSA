@@ -23,7 +23,8 @@ from torch.utils.data import DataLoader
 from transformers import AutoTokenizer, get_linear_schedule_with_warmup
 from torch.optim import AdamW
 from sklearn.model_selection import train_test_split
-import plot_training_curves
+from src.subtask_1.progress_visualization.plot_training_curves import plot_training_curves
+
 # --- Project imports ---
 project_root = os.path.abspath(os.path.dirname(__file__))
 if project_root not in sys.path:
