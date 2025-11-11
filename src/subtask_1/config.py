@@ -7,7 +7,7 @@ LANG = "eng"
 DOMAIN = "laptop"
 
 # Model settings
-MODEL_NAME = "bert-base-multilingual-cased"
+MODEL_NAME = "roberta-base"
 MODEL_VERSION_ID = "v1.4"
 
 # Training settings
