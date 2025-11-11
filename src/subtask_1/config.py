@@ -11,7 +11,7 @@ MODEL_NAME = "roberta-base"
 MODEL_VERSION_ID = "v1.4"
 
 # Training settings
-LEARNING_RATE = 1e-5
+LEARNING_RATE = 2e-5
 EPOCHS = 20
 BATCH_SIZE = 8
 MAX_LEN = 128
