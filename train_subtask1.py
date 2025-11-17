@@ -1,6 +1,5 @@
 import sys
 import os
-
 import pandas as pd
 import torch
 import torch.nn as nn
@@ -22,7 +21,6 @@ from src.subtask_1.progress_visualization.generate_results_plot import generate_
 
 
 def main(override_config: Optional[Dict[str, Any]] = None) -> float:
-
     if override_config is None:
         override_config = {}
 
@@ -31,10 +29,10 @@ def main(override_config: Optional[Dict[str, Any]] = None) -> float:
     batch_size = override_config.get("batch_size", config.BATCH_SIZE)
     epochs = override_config.get("epochs", config.EPOCHS)
     patience = override_config.get("patience", config.PATIENCE)
-
     model_version_id = override_config.get("version_id", config.MODEL_VERSION_ID)
-
     dropout_rate = override_config.get("dropout", 0.1)
+
+    utils.set_seed(42)
 
     print(f"\n--- STARTING TRIAL: {model_version_id} ---")
     print(f"Model: {model_name}, LR: {learning_rate}, BS: {batch_size}, Dropout: {dropout_rate}")
@@ -73,7 +71,7 @@ def main(override_config: Optional[Dict[str, Any]] = None) -> float:
     loss_fn = nn.MSELoss()
 
     num_training_steps = len(train_loader) * epochs
-    num_warmup_steps = int(num_training_steps * 0.1)  # 10% warmup
+    num_warmup_steps = int(num_training_steps * 0.1)
 
     scheduler = get_linear_schedule_with_warmup(
         optimizer,
@@ -97,43 +95,67 @@ def main(override_config: Optional[Dict[str, Any]] = None) -> float:
 
         if val_loss < best_val_loss:
             best_val_loss = val_loss
+            torch.save(model.state_dict(), config.MODEL_SAVE_PATH)
+            epochs_no_improve = 0
         else:
             epochs_no_improve += 1
+
         if epochs_no_improve == patience:
             print(f"Early stopping at epoch {epoch + 1} as val_loss did not improve for {patience} epochs.")
             break
 
-        print("--- Training Finished ---")
-        pred_v, pred_a, gold_v, gold_a = utils.get_predictions(model, dev_loader, device, type="dev")
-        eval_score = utils.evaluate_predictions_task1(pred_a, pred_v, gold_a, gold_v)
+    print("--- Training Finished ---")
 
-        print(f"\n--- Dev Set Evaluation ---")
-        print(f"PCC_V: {eval_score['PCC_V']:.4f}")
-        print(f"PCC_A: {eval_score['PCC_A']:.4f}")
-        print(f"RMSE_VA: {eval_score['RMSE_VA']:.4f}")
-        print("--------------------------")
+    print("Loading best model for evaluation...")
+    if os.path.exists(config.MODEL_SAVE_PATH):
+        model.load_state_dict(torch.load(config.MODEL_SAVE_PATH))
+    else:
+        print("Warning: No best model saved. Using model from final epoch.")
 
-        print("\n--- Protokollierung der Ergebnisse ---")
-        results_data = {
-            'date': pd.Timestamp.now().strftime('%Y-%m-%d'),
-            'version': model_version_id,  # Verwendet die überschriebene Version
-            'model': model_name,
-            'pcc_v': eval_score['PCC_V'],
-            'pcc_a': eval_score['PCC_A'],
-            'rmse_va': eval_score['RMSE_VA']
-        }
+    pred_v, pred_a, gold_v, gold_a = utils.get_predictions(model, dev_loader, device, type="dev")
+    eval_score = utils.evaluate_predictions_task1(pred_a, pred_v, gold_a, gold_v)
 
-        print("Running plotting script...")
-        try:
-            utils.log_results_to_csv("src/subtask_1/progress_visualization/results.csv", results_data)
-            generate_plot()
-            print("Plotting complete.")
-        except Exception as e:
-            print(f"Error running plot script: {e}")
+    print(f"\n--- Dev Set Evaluation ---")
+    print(f"PCC_V: {eval_score['PCC_V']:.4f}")
+    print(f"PCC_A: {eval_score['PCC_A']:.4f}")
+    print(f"RMSE_VA: {eval_score['RMSE_VA']:.4f}")
+    print("--------------------------")
 
-        return eval_score['RMSE_VA']
+    print("Running predictions on the test set...")
+    pred_v, pred_a = utils.get_predictions(model, predict_loader, device, type="pred")
 
-    if __name__ == "__main__":
-        main()
+    predict_df["Valence"] = pred_v
+    predict_df["Arousal"] = pred_a
+
+    os.makedirs(os.path.dirname(config.PREDICTION_FILE), exist_ok=True)
+    utils.df_to_jsonl(predict_df, config.PREDICTION_FILE)
+    print(f"Predictions saved to {config.PREDICTION_FILE}")
+
+    print("\n--- Protokollierung der Ergebnisse ---")
+    results_data = {
+        'date': pd.Timestamp.now().strftime('%Y-%m-%d'),
+        'version': model_version_id,
+        'model': model_name,
+        'pcc_v': eval_score['PCC_V'],
+        'pcc_a': eval_score['PCC_A'],
+        'rmse_va': eval_score['RMSE_VA']
+    }
+
+    utils.log_results_to_csv("src/subtask_1/progress_visualization/results.csv", results_data)
+
+    return eval_score['RMSE_VA']
 
 
+if __name__ == "__main__":
+
+    final_rmse = main()
+
+    print("\n--- MANUELLER LAUF ABGESCHLOSSEN ---")
+    print(f"Finaler RMSE (an Optuna zurückgegeben): {final_rmse:.4f}")
+
+    print("Running plotting script...")
+    try:
+        generate_plot()
+        print("Plotting complete.")
+    except Exception as e:
+        print(f"Error running plot script: {e}")
