@@ -71,7 +71,7 @@ if __name__ == "__main__":
 
     print("\nUpdating final Plot and README with all trial results...")
     try:
-        create_plot()
+        generate_plot()
         print("Plotting complete.")
     except Exception as e:
         print(f"Error running plot script: {e}")
