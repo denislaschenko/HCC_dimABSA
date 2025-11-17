@@ -134,7 +134,7 @@ def main(override_config: Optional[Dict[str, Any]] = None) -> float:
     print("\n--- Protokollierung der Ergebnisse ---")
     results_data = {
         'date': pd.Timestamp.now().strftime('%Y-%m-%d'),
-        'version': model_version_id,
+        'experiment': model_version_id,
         'model': model_name,
         'pcc_v': eval_score['PCC_V'],
         'pcc_a': eval_score['PCC_A'],
