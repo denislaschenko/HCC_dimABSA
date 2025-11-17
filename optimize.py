@@ -11,7 +11,7 @@ try:
     from train_subtask1 import main as run_training_trial
     from src.subtask_1 import config
     from src.shared import utils
-    from src.subtask_1.progress_visualization.plot_generator import create_plot
+    from src.subtask_1.progress_visualization.generate_results_plot import generate_plot
 except ImportError as e:
     print(
         f"Fehler: Notwendige Skripte konnten nicht importiert werden. Stellen Sie sicher, dass __init__.py-Dateien vorhanden sind.")
