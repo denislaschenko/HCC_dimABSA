@@ -8,6 +8,7 @@ from transformers import AutoTokenizer, get_linear_schedule_with_warmup
 from torch.optim import AdamW
 from sklearn.model_selection import train_test_split
 from typing import Dict, Any, Optional
+import time
 
 project_root = os.path.abspath(os.path.dirname(__file__))
 if project_root not in sys.path:
@@ -21,6 +22,7 @@ from src.subtask_1.progress_visualization.generate_results_plot import generate_
 
 
 def main(override_config: Optional[Dict[str, Any]] = None) -> float:
+    trial_start_time = time.time()
     if override_config is None:
         override_config = {}
 
@@ -142,6 +144,12 @@ def main(override_config: Optional[Dict[str, Any]] = None) -> float:
     }
 
     utils.log_results_to_csv("src/subtask_1/progress_visualization/results.csv", results_data)
+
+    trial_end_time = time.time()
+    total_seconds = trial_end_time - trial_start_time
+    minutes = int(total_seconds // 60)
+    seconds = int(total_seconds % 60)
+    print(f"--- TRIAL TIME: {minutes:02d}m {seconds:02d}s ---")
 
     return eval_score['RMSE_VA']
 
