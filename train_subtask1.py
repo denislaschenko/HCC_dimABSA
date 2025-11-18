@@ -34,7 +34,7 @@ def main(override_config: Optional[Dict[str, Any]] = None) -> float:
     model_version_id = override_config.get("version_id", config.MODEL_VERSION_ID)
     dropout_rate = override_config.get("dropout", 0.0969871288542621)
 
-    utils.set_seed(42)
+    utils.set_seed(1)
 
     print(f"\n--- STARTING TRIAL: {model_version_id} ---")
     print(f"Model: {model_name}, LR: {learning_rate}, BS: {batch_size}, Dropout: {dropout_rate}")
