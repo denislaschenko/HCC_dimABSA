@@ -32,7 +32,7 @@ def main(override_config: Optional[Dict[str, Any]] = None) -> float:
     epochs = override_config.get("epochs", config.EPOCHS)
     patience = override_config.get("patience", config.PATIENCE)
     model_version_id = override_config.get("version_id", config.MODEL_VERSION_ID)
-    dropout_rate = override_config.get("dropout", 0.1)
+    dropout_rate = override_config.get("dropout", 0.0969871288542621)
 
     utils.set_seed(42)
 
