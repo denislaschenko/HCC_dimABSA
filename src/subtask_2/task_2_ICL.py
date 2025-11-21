@@ -156,7 +156,7 @@ def run_pipeline(
     # Load checkpoint
     if not reg_model_checkpoint:
         raise ValueError("You must provide --reg_model_checkpoint path to the trained Subtask1 regressor.")
-    ck = torch.load(reg_model_checkpoint, map_location="cpu")
+    ck = torch.load(reg_model_checkpoint, map_location="cpu", weights_only=False)
     # assume state dict is saved under "model_state" or directly
     if isinstance(ck, dict) and "model_state" in ck:
         reg_model.load_state_dict(ck["model_state"])
