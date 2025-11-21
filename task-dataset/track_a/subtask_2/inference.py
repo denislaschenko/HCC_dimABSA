@@ -2,9 +2,9 @@ import json
 import torch
 from transformers import AutoTokenizer
 
-from src.subtask_2.model import DimASTEModel
-from src.subtask_2.extractor import extract_triplets
-from src.subtask_2 import config
+from subtask_2.model import DimASTEModel
+from subtask_2.extractor import extract_triplets
+from subtask_2 import config
 
 def run_inference(input_path, output_path):
     tokenizer = AutoTokenizer.from_pretrained(config.MODEL_NAME)
