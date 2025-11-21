@@ -3,9 +3,9 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 from transformers import AutoTokenizer, AdamW, get_linear_schedule_with_warmup
 
-from subtask_2.dataset import ASTEDataset
-from subtask_2.model import DimASTEModel
-from subtask_2 import config
+from src.subtask_2.dataset import ASTEDataset
+from src.subtask_2.model import DimASTEModel
+from src.subtask_2 import config
 from src.shared import utils
 
 def compute_loss(asp_logits, opn_logits, va_pred, batch):
