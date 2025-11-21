@@ -1,4 +1,4 @@
-
+import os
 MODEL_NAME = "bert-base-uncased"
 
 MAX_LEN = 128
