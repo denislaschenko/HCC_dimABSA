@@ -11,8 +11,8 @@ TRAIN_FILE = "task-dataset/track_a/subtask_1/eng/eng_laptop_train_alltasks.jsonl
 DEV_FILE   = "src/subtask_2/eng_laptop_dev_task2.jsonl"
 PRED_OUTPUT_FILE = "src/subtask2/test_output.jsonl"
 
-PROCESSED_TRAIN = "data/subtask2/train_bio.jsonl"
-PROCESSED_DEV   = "data/subtask2/dev_bio.jsonl"
+PROCESSED_TRAIN = "src/subtask_2/train_bio.jsonl"
+PROCESSED_DEV   = "src/subtask_2/dev_bio.jsonl"
 
 
-MODEL_SAVE_PATH = "models/subtask2/best_model.pt"
+MODEL_SAVE_PATH = "src/subtask2/best_model.pt"
