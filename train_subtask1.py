@@ -34,7 +34,7 @@ def main(override_config: Optional[Dict[str, Any]] = None) -> float:
     model_version_id = override_config.get("version_id", config.MODEL_VERSION_ID)
     dropout_rate = override_config.get("dropout", 0.1)
 
-    utils.set_seed(42)
+    utils.set_seed(25)
 
     print(f"\n--- STARTING TRIAL: {model_version_id} ---")
     print(f"Model: {model_name}, LR: {learning_rate}, BS: {batch_size}, Dropout: {dropout_rate}")
@@ -55,7 +55,7 @@ def main(override_config: Optional[Dict[str, Any]] = None) -> float:
     train_df = utils.jsonl_to_df(train_raw)
     predict_df = utils.jsonl_to_df(predict_raw)
 
-    train_df, dev_df = train_test_split(train_df, test_size=0.1, random_state=42)
+    train_df, dev_df = train_test_split(train_df, test_size=0.1, random_state=25)
     print(f"Data loaded: {len(train_df)} train, {len(dev_df)} dev, {len(predict_df)} predict samples.")
 
     train_dataset = VADataset(train_df, tokenizer, max_len=config.MAX_LEN)

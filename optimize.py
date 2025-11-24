@@ -21,9 +21,9 @@ except ImportError as e:
 
 def objective(trial: optuna.trial.Trial) -> float:
     override_params = {
-        "lr": trial.suggest_float("lr", 1e-5, 5e-5, log=True),
-        "batch_size": trial.suggest_categorical("batch_size", [4, 8, 16]),
-        "dropout": trial.suggest_float("dropout", 0.1, 0.3),
+        "lr": trial.suggest_float("lr", 6e-6, 3e-5, log=True),
+        "batch_size": 4,
+        "dropout": trial.suggest_float("dropout", 0.08, 0.16),
 
         "model_name": "roberta-base",
         "epochs": config.EPOCHS,
@@ -43,20 +43,28 @@ def objective(trial: optuna.trial.Trial) -> float:
 
 
 if __name__ == "__main__":
-
-    try:
-        import optuna
-    except ImportError:
-        print("Optuna nicht gefunden. Installiere Optuna...")
-        os.system("pip install optuna")
-        import optuna
-
     print("Starting Optuna Hyperparameter Optimization...")
 
-    study = optuna.create_study(direction="minimize")
+    sampler = optuna.samplers.TPESampler(
+        seed=42,
+        multivariate=True,
+        group=True
+    )
+
+    pruner = optuna.pruners.MedianPruner(
+        n_startup_trials=10,
+        n_warmup_steps=0,
+        interval_steps=1
+    )
+
+    study = optuna.create_study(
+        direction="minimize",
+        sampler=sampler,
+        pruner=pruner
+    )
 
     try:
-        study.optimize(objective, n_trials=20)
+        study.optimize(objective, n_trials=50)
     except KeyboardInterrupt:
         print("\nOptimierung durch Benutzer abgebrochen.")
 
