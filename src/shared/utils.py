@@ -8,6 +8,23 @@ import numpy as np
 import torch
 from typing import List, Dict
 from scipy.stats import pearsonr
+from torch import nn
+
+
+class CCCLoss(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, x, y):
+        x = x.view(-1)
+        y = y.view(-1)
+        cov_matrix = torch.cov(torch.stack([x, y]))
+        covariance = cov_matrix[0, 1]
+        var_x = cov_matrix[0, 0]
+        var_y = cov_matrix[1, 1]
+        mean_diff = x.mean() - y.mean()
+        ccc = (2 * covariance) / (var_x + var_y + mean_diff ** 2 + 1e-8)
+        return 1.0 - ccc
 
 def load_jsonl(filepath: str) -> List[Dict]:
     try:
