@@ -8,10 +8,10 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 try:
-    from train_subtask1 import main as run_training_trial
+    from src.subtask_1.train_subtask1 import main as run_training_trial
     from src.subtask_1 import config
     from src.shared import utils
-    from src.subtask_1.progress_visualization.generate_results_plot import generate_plot
+    from scripts.vis import generate_plot
 except ImportError as e:
     print(
         f"Fehler: Notwendige Skripte konnten nicht importiert werden. Stellen Sie sicher, dass __init__.py-Dateien vorhanden sind.")

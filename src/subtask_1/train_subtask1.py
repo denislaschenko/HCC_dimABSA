@@ -18,7 +18,7 @@ from src.subtask_1 import config
 from src.shared import utils
 from src.subtask_1.dataset import VADataset
 from src.subtask_1.model import TransformerVARegressor
-from src.subtask_1.progress_visualization.generate_results_plot import generate_plot
+from scripts.vis import generate_plot
 
 
 def main(override_config: Optional[Dict[str, Any]] = None) -> float:
@@ -143,7 +143,7 @@ def main(override_config: Optional[Dict[str, Any]] = None) -> float:
         'rmse_va': eval_score['RMSE_VA']
     }
 
-    utils.log_results_to_csv("src/subtask_1/progress_visualization/results.csv", results_data)
+    utils.log_results_to_csv("../../outputs/subtask_1/figures/results.csv", results_data)
 
     trial_end_time = time.time()
     total_seconds = trial_end_time - trial_start_time

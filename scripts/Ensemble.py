@@ -11,7 +11,7 @@ PREDICTION_FILES = [
     "predictions/subtask_1/pred_eng_laptop_123.jsonl"
 ]
 
-OUTPUT_FILE = "predictions/subtask_1/pred_ensemble_final.jsonl"
+OUTPUT_FILE = "../outputs/subtask_1/predictions/pred_ensemble_final.jsonl"
 
 
 def load_predictions(filepath):
