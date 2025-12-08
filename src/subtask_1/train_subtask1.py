@@ -143,7 +143,7 @@ def main(override_config: Optional[Dict[str, Any]] = None) -> float:
         'rmse_va': eval_score['RMSE_VA']
     }
 
-    utils.log_results_to_csv("../../outputs/subtask_1/figures/results.csv", results_data)
+    utils.log_results_to_csv("../../outputs/subtask_1/logs/results.csv", results_data)
 
     trial_end_time = time.time()
     total_seconds = trial_end_time - trial_start_time

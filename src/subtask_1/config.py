@@ -30,12 +30,11 @@ TRAIN_FILE = os.path.join(DATA_DIR, f"{LANG}_{DOMAIN}_train_alltasks.jsonl")
 PREDICT_FILE = os.path.join(DATA_DIR, f"{LANG}_{DOMAIN}_dev_{TASK}.jsonl")
 
 # Output settings
-MODEL_SAVE_DIR = "models"
-PREDICTION_DIR = "predictions"
-PREDICTION_SUBDIR = os.path.join(PROJECT_ROOT, PREDICTION_DIR, SUBTASK)
+MODEL_SAVE_DIR = os.path.join("outputs", "subtask_1", "models")
+PREDICTION_DIR = os.path.join("outputs", "subtask_1", "predictions")
 
 
-PREDICTION_FILE = os.path.join(PREDICTION_SUBDIR, f"pred_{LANG}_{DOMAIN}.jsonl")
-TEST_FILE = os.path.join(PREDICTION_SUBDIR, f"test_{LANG}_{DOMAIN}.jsonl")
+PREDICTION_FILE = os.path.join(PREDICTION_DIR, f"pred_{LANG}_{DOMAIN}.jsonl")
+TEST_FILE = os.path.join(PREDICTION_DIR, f"test_{LANG}_{DOMAIN}.jsonl")
 
 MODEL_SAVE_PATH = os.path.join(PROJECT_ROOT, MODEL_SAVE_DIR, SUBTASK, "best_model.pt")
