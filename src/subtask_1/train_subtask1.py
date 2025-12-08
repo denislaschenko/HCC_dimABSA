@@ -18,7 +18,7 @@ from src.subtask_1 import config
 from src.shared import utils
 from src.subtask_1.dataset import VADataset
 from src.subtask_1.model import TransformerVARegressor
-from scripts.vis import generate_plot
+from scripts.vis import generate_results_plot
 
 
 def main(override_config: Optional[Dict[str, Any]] = None) -> float:
@@ -163,7 +163,7 @@ if __name__ == "__main__":
 
     print("Running plotting script...")
     try:
-        generate_plot()
+        generate_results_plot.generate_plot()
         print("Plotting complete.")
     except Exception as e:
         print(f"Error running plot script: {e}")
