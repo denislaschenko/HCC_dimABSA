@@ -70,7 +70,7 @@ def main(override_config: Optional[Dict[str, Any]] = None) -> float:
     model = TransformerVARegressor(model_name=model_name, dropout=dropout_rate).to(device)
 
     optimizer = AdamW(model.parameters(), lr=learning_rate)
-    loss_fn = nn.MSELoss()
+    loss_fn = utils.CCCLoss()
 
     num_training_steps = len(train_loader) * epochs
     num_warmup_steps = int(num_training_steps * 0.1)
