@@ -17,7 +17,7 @@ from src.subtask_1 import config
 from src.shared import utils
 from src.subtask_1.dataset import VADataset
 from src.subtask_1.model import TransformerVARegressor
-from src.subtask_1.progress_visualization.generate_results_plot import generate_plot
+from scripts.vis.generate_results_plot import generate_plot
 
 
 def main():
@@ -58,7 +58,7 @@ def main():
     model = TransformerVARegressor(model_name=config.MODEL_NAME).to(device)
 
     optimizer = AdamW(model.parameters(), lr=config.LEARNING_RATE)
-    loss_fn = nn.HuberLoss()
+    loss_fn = utils.LDLLoss()
 
     num_training_steps = len(train_loader) * config.EPOCHS
     num_warmup_steps = int(num_training_steps * 0.1)  # 10% warmup
@@ -101,7 +101,7 @@ def main():
     print("Loading best model for evaluation...")
     model.load_state_dict(torch.load(config.MODEL_SAVE_PATH))
 
-    pred_v, pred_a, gold_v, gold_a = utils.get_predictions(model, dev_loader, device, type="dev")
+    pred_v, pred_a, gold_v, gold_a = utils.get_ldl_predictions(model, dev_loader, device, type="dev")
     eval_score = utils.evaluate_predictions_task1(pred_a, pred_v, gold_a, gold_v)
 
     print(f"\n--- Dev Set Evaluation ---")
@@ -111,7 +111,7 @@ def main():
     print("--------------------------")
 
     print("Running predictions on the test set...")
-    pred_v, pred_a = utils.get_predictions(model, predict_loader, device, type="pred")
+    pred_v, pred_a = utils.get_ldl_predictions(model, predict_loader, device, type="pred")
 
     predict_df["Valence"] = pred_v
     predict_df["Arousal"] = pred_a

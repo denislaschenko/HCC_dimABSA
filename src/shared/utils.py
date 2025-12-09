@@ -9,7 +9,16 @@ import torch
 from typing import List, Dict
 from scipy.stats import pearsonr
 from torch import nn
+from torch.nn import functional
 
+class LDLLoss(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.kldiv = nn.KLDivLoss(reduction='batchmean')
+
+    def forward(self, logits, targets):
+        log_probs = functional.log_softmax(logits, dim=1)
+        return self.kldiv(log_probs, targets)
 
 class CCCLoss(nn.Module):
     def __init__(self):
@@ -114,6 +123,42 @@ def evaluate_predictions_task1(pred_a, pred_v, gold_a, gold_v) -> dict:
         'RMSE_VA': rmse_va,
     }
 
+def get_ldl_predictions(model, dataloader, device, type="dev", num_bins=9):
+    model.eval()
+    pred_v = []
+    pred_a = []
+    gold_v = []
+    gold_a = []
+
+    bins = torch.linspace(1.0, 9.0, num_bins).to(device)
+
+    with torch.no_grad():
+        for batch in dataloader:
+            input_ids = batch["input_ids"].to(device)
+            attention_mask = batch["attention_mask"].to(device)
+
+            v_logits, a_logits = model(input_ids, attention_mask)
+
+            v_probs = torch.softmax(v_logits, dim=1)
+            a_probs = torch.softmax(a_logits, dim=1)
+
+            v_scores = torch.sum(v_probs * bins, dim=1)
+            a_scores = torch.sum(a_probs * bins, dim=1)
+
+            pred_v.extend(v_scores.cpu().tolist())
+            pred_a.extend(a_scores.cpu().tolist())
+
+            if type == "dev":
+                if "orig_scores" in batch:
+                    orig = batch["orig_scores"]  # shape [batch, 2]
+                    gold_v.extend(orig[:, 0].tolist())
+                    gold_a.extend(orig[:, 1].tolist())
+                else:
+                    pass
+    if type == "dev":
+        return pred_v, pred_a, gold_v, gold_a
+    else:
+        return pred_v, pred_a
 
 def extract_num(s: str) -> int:
     m = re.search(r"(\d+)$", str(s))
