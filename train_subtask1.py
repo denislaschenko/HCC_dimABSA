@@ -58,7 +58,7 @@ def main():
     model = TransformerVARegressor(model_name=config.MODEL_NAME).to(device)
 
     optimizer = AdamW(model.parameters(), lr=config.LEARNING_RATE)
-    loss_fn = nn.MSELoss()
+    loss_fn = nn.HuberLoss()
 
     num_training_steps = len(train_loader) * config.EPOCHS
     num_warmup_steps = int(num_training_steps * 0.1)  # 10% warmup
