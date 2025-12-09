@@ -19,7 +19,7 @@ from datasets import load_dataset
 import math
 from datetime import datetime
 import torch
-pip install unsloth
+pip install --no-deps unsloth
 from unsloth import FastLanguageModel
 from transformers import TrainingArguments
 from trl import SFTTrainer
