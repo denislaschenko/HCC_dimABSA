@@ -2,9 +2,10 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import os
 
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-CSV_FILE = os.path.join(SCRIPT_DIR, "results.csv")
-OUTPUT_FILE = os.path.join(SCRIPT_DIR, "performance_plot.png")
+from src.subtask_1.config import DATA_DIR, PREDICTION_DIR
+
+CSV_FILE = os.path.join(DATA_DIR, "results.csv")
+OUTPUT_FILE = os.path.join(PREDICTION_DIR, "performance_plot.png")
 
 def generate_plot():
     try:
