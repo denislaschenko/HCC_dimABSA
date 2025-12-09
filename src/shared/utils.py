@@ -11,6 +11,9 @@ from scipy.stats import pearsonr
 from torch import nn
 from torch.nn import functional
 
+from src.subtask_1 import config
+
+
 class LDLLoss(nn.Module):
     def __init__(self):
         super().__init__()
@@ -123,7 +126,7 @@ def evaluate_predictions_task1(pred_a, pred_v, gold_a, gold_v) -> dict:
         'RMSE_VA': rmse_va,
     }
 
-def get_ldl_predictions(model, dataloader, device, type="dev", num_bins=9):
+def get_ldl_predictions(model, dataloader, device, type="dev", num_bins=config.NUM_BINS):
     model.eval()
     pred_v = []
     pred_a = []

@@ -4,7 +4,7 @@ from transformers import AutoModel
 from tqdm import tqdm
 
 class TransformerVARegressor(nn.Module):
-    def __init__(self, model_name: str, dropout: float = 0.1, num_bins: int = 9):
+    def __init__(self, model_name: str, dropout: float = 0.1, num_bins: int = 81):
         super().__init__()
         self.backbone = AutoModel.from_pretrained(model_name)
         self.dropout = nn.Dropout(dropout)

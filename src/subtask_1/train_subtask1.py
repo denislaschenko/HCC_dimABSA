@@ -46,16 +46,16 @@ def main():
     train_df, dev_df = train_test_split(train_df, test_size=0.1, random_state=42)
     print(f"Data loaded: {len(train_df)} train, {len(dev_df)} dev, {len(predict_df)} predict samples.")
 
-    train_dataset = VADataset(train_df, tokenizer, max_len=config.MAX_LEN)
+    train_dataset = VADataset(train_df, tokenizer, max_len=config.MAX_LEN, num_bins=config.NUM_BINS, sigma=1.0)
     train_loader = DataLoader(train_dataset, batch_size=config.BATCH_SIZE, shuffle=True)
 
-    dev_dataset = VADataset(dev_df, tokenizer, max_len=config.MAX_LEN)
+    dev_dataset = VADataset(dev_df, tokenizer, max_len=config.MAX_LEN, num_bins=config.NUM_BINS, sigma=1.0)
     dev_loader = DataLoader(dev_dataset, batch_size=config.BATCH_SIZE, shuffle=False)
 
     predict_dataset = VADataset(predict_df, tokenizer, max_len=config.MAX_LEN)
     predict_loader = DataLoader(predict_dataset, batch_size=config.BATCH_SIZE, shuffle=False)
 
-    model = TransformerVARegressor(model_name=config.MODEL_NAME).to(device)
+    model = TransformerVARegressor(model_name=config.MODEL_NAME, num_bins=config.NUM_BINS).to(device)
 
     optimizer = AdamW(model.parameters(), lr=config.LEARNING_RATE)
     loss_fn = utils.LDLLoss()
