@@ -7,6 +7,8 @@ Single-file script to train, infer, and evaluate Dimensional Aspect Sentiment Tr
 NOTE: This script follows the Colab notebook but organizes it in a single runnable file.
 """
 
+
+
 import os
 import re
 import json
@@ -16,8 +18,14 @@ from typing import List, Dict, Tuple, Optional
 from datasets import load_dataset
 import math
 from datetime import datetime
+import torch
+pip install unsloth
+from unsloth import FastLanguageModel
+from transformers import TrainingArguments
+from trl import SFTTrainer
 
-# ---- These imports assume you have the same environment as the Colab
+
+
 try:
     from unsloth import FastLanguageModel
 except Exception as e:
