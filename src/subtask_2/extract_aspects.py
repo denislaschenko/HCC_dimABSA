@@ -20,10 +20,10 @@ Input:
 {"ID": "lap26_aspect_va_dev_30", "Text": "Plenty of memory and processing power but way too many programs and apps"}
 
 Output:
-{"ID": "lap26_aspect_va_dev_30", "Text": "Plenty of memory and processing power but way too many programs and apps", "Aspect": ["memory", "processing power"]}
+{"ID": "laptop_quad_dev_1", "Text": "this unit is pretty and stylish , so my high school daughter was attracted to it for that reason .", "Triplet": [{"Aspect": "unit", "Opinion": "pretty", "VA": "0#0"}, {"Aspect": "unit", "Opinion": "stylish", "VA": "0#0"}]}
 
 ### Question:
-Now complete the following example:
+Now complete the following example, never change the Layout described in the Output examples and always predict "VA" to be "0#0":
 Input:
 """
 
@@ -37,10 +37,16 @@ def build_prompt(text: str):
     return f"<|user|>\n{prompt}\n<|assistant|>\n"
 
 def extract_aspects_from_llm_output(output_text: str):
-    pattern = r'\(([^,]+),\s*([^,]+)\)'
+    pattern = r'"Aspect":\s*"([^"]+)",\s*"Opinion":\s*"([^"]+)"'
     matches = re.findall(pattern, output_text)
     aspects = [m[0].strip() for m in matches]
     return aspects
+
+def extract_opinion_from_llm_output(output_text: str):
+    pattern = r'"Aspect":\s*"([^"]+)",\s*"Opinion":\s*"([^"]+)"'
+    matches = re.findall(pattern, output_text)
+    opinions = [m[1].strip() for m in matches]
+    return opinions
 
 def process_jsonl(model_name, input_path, output_path):
     print(f"Loading model: {model_name}")
@@ -89,11 +95,13 @@ def process_jsonl(model_name, input_path, output_path):
             llm_output = tokenizer.decode(generated_tokens, skip_special_tokens=True).strip()
 
             aspects = extract_aspects_from_llm_output(llm_output)
+            opinions = extract_opinion_from_llm_output(llm_output)
 
             new_entry = {
                 "ID": item["ID"],
                 "Text": text,
-                "Aspect": aspects
+                "Aspect": aspects,
+                "Opinion": opinions
             }
             fout.write(json.dumps(new_entry, ensure_ascii=False) + "\n")
             fout.flush() # 🟢 FIX: Ensure data is written to disk immediately
