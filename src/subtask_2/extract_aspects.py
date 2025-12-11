@@ -11,20 +11,16 @@ from tqdm import tqdm  # 🟢 Added for progress visibility
 ICL_PROMPT = """Below is an instruction describing a task, paired with an input that provides additional context. Your goal is to generate an output that correctly completes the task.
 
 ### Instruction:
-Given a textual instance [Text], extract all (A, O, VA) triplets, where:
-- A is an Aspect term (a phrase describing an entity mentioned in [Text])
+Given a textual instance [Text], extract all (A, O) tupels, where:
+- A is an Aspect term (a phrase describing an entity mentioned in "Text")
 - O is an Opinion term
-- VA is a Valence–Arousal score in the format (valence#arousal)
-
-Valence ranges from 1 (negative) to 9 (positive),
-Arousal ranges from 1 (calm) to 9 (excited).
 
 ### Example:
 Input:
-[Text] average to good thai food, but terrible delivery.
+{"ID": "lap26_aspect_va_dev_30", "Text": "Plenty of memory and processing power but way too many programs and apps"}
 
 Output:
-[Triplet] (thai food, average to good, 6.75#6.38), (delivery, terrible, 2.88#6.62)
+{"ID": "lap26_aspect_va_dev_30", "Text": "Plenty of memory and processing power but way too many programs and apps", "Aspect": ["memory", "processing power"]}
 
 ### Question:
 Now complete the following example:
@@ -41,7 +37,7 @@ def build_prompt(text: str):
     return f"<|user|>\n{prompt}\n<|assistant|>\n"
 
 def extract_aspects_from_llm_output(output_text: str):
-    pattern = r'\(([^,]+),\s*([^,]+),\s*[\d.]+#[\d.]+\)'
+    pattern = r'\(([^,]+),\s*([^,]+)\)'
     matches = re.findall(pattern, output_text)
     aspects = [m[0].strip() for m in matches]
     return aspects
@@ -117,3 +113,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
