@@ -13,10 +13,11 @@ MODEL_VERSION_ID = "v1.4"
 # Training settings
 LEARNING_RATE = 1.1796630496108734e-05
 EPOCHS = 20
-BATCH_SIZE = 4
+BATCH_SIZE = 32
 MAX_LEN = 128
 PATIENCE = 2
 NUM_BINS = 81
+SIGMA = 0.3
 
 #Data file paths
 CONFIG_DIR = os.path.dirname(os.path.abspath(__file__))

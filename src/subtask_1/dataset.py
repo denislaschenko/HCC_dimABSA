@@ -15,7 +15,7 @@ def generate_label_distribution(target_value, min_val=1.0, max_val=9.0, num_bins
 
 class VADataset(Dataset):
 
-    def __init__(self, dataframe, tokenizer: PreTrainedTokenizer, max_len: int, num_bins: int = 9, sigma: float = 1.0):
+    def __init__(self, dataframe, tokenizer: PreTrainedTokenizer, max_len: int, num_bins: int, sigma: float):
         self.sentences = dataframe["Text"].tolist()
         self.aspects = dataframe["Aspect"].tolist()
         self.labels = dataframe[["Valence", "Arousal"]].values.astype(float)

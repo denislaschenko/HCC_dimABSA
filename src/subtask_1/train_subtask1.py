@@ -46,10 +46,10 @@ def main():
     train_df, dev_df = train_test_split(train_df, test_size=0.1, random_state=42)
     print(f"Data loaded: {len(train_df)} train, {len(dev_df)} dev, {len(predict_df)} predict samples.")
 
-    train_dataset = VADataset(train_df, tokenizer, max_len=config.MAX_LEN, num_bins=config.NUM_BINS, sigma=1.0)
+    train_dataset = VADataset(train_df, tokenizer, max_len=config.MAX_LEN, num_bins=config.NUM_BINS, sigma=config.SIGMA)
     train_loader = DataLoader(train_dataset, batch_size=config.BATCH_SIZE, shuffle=True)
 
-    dev_dataset = VADataset(dev_df, tokenizer, max_len=config.MAX_LEN, num_bins=config.NUM_BINS, sigma=1.0)
+    dev_dataset = VADataset(dev_df, tokenizer, max_len=config.MAX_LEN, num_bins=config.NUM_BINS, sigma=config.SIGMA)
     dev_loader = DataLoader(dev_dataset, batch_size=config.BATCH_SIZE, shuffle=False)
 
     predict_dataset = VADataset(predict_df, tokenizer, max_len=config.MAX_LEN)
