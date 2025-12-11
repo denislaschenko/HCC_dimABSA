@@ -84,10 +84,11 @@ def process_jsonl(model_name, input_path, output_path):
                 generated = model.generate(
                     **inputs,
                     max_new_tokens=128,
-                    temperature=0.3,
+                    temperature=0.1,
                     top_p=0.9,
                     pad_token_id=tokenizer.eos_token_id # 🟢 FIX: Explicitly set pad token
                 )
+
 
             # 🟢 Optimization: Only decode the NEW tokens
             input_len = inputs.input_ids.shape[1]
@@ -105,6 +106,8 @@ def process_jsonl(model_name, input_path, output_path):
             }
             fout.write(json.dumps(new_entry, ensure_ascii=False) + "\n")
             fout.flush() # 🟢 FIX: Ensure data is written to disk immediately
+
+            print(llm_output)
 
     print("Done.")
 
