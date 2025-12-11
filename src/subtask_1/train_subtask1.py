@@ -52,7 +52,7 @@ def main():
     dev_dataset = VADataset(dev_df, tokenizer, max_len=config.MAX_LEN, num_bins=config.NUM_BINS, sigma=config.SIGMA)
     dev_loader = DataLoader(dev_dataset, batch_size=config.BATCH_SIZE, shuffle=False)
 
-    predict_dataset = VADataset(predict_df, tokenizer, max_len=config.MAX_LEN)
+    predict_dataset = VADataset(predict_df, tokenizer, max_len=config.MAX_LEN, num_bins=config.NUM_BINS, sigma=config.SIGMA)
     predict_loader = DataLoader(predict_dataset, batch_size=config.BATCH_SIZE, shuffle=False)
 
     model = TransformerVARegressor(model_name=config.MODEL_NAME, num_bins=config.NUM_BINS).to(device)
