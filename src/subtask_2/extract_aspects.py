@@ -36,17 +36,10 @@ def build_prompt(text: str):
     # Qwen/Llama specific chat formatting
     return f"<|user|>\n{prompt}\n<|assistant|>\n"
 
-def extract_aspects_from_llm_output(output_text: str):
-    pattern = r'"Aspect":\s*"([^"]+)",\s*"Opinion":\s*"([^"]+)"'
+def extract_pairs_from_llm_output(output_text: str):
+    pattern = r'"Aspect":\s*"([^"]+)"\s*,\s*"Opinion":\s*"([^"]+)"'
     matches = re.findall(pattern, output_text)
-    aspects = [m[0].strip() for m in matches]
-    return aspects
-
-def extract_opinion_from_llm_output(output_text: str):
-    pattern = r'"Aspect":\s*"([^"]+)",\s*"Opinion":\s*"([^"]+)"'
-    matches = re.findall(pattern, output_text)
-    opinions = [m[1].strip() for m in matches]
-    return opinions
+    return matches
 
 def process_jsonl(model_name, input_path, output_path):
     print(f"Loading model: {model_name}")
@@ -89,21 +82,23 @@ def process_jsonl(model_name, input_path, output_path):
                     pad_token_id=tokenizer.eos_token_id # 🟢 FIX: Explicitly set pad token
                 )
 
-
-            # 🟢 Optimization: Only decode the NEW tokens
             input_len = inputs.input_ids.shape[1]
             generated_tokens = generated[0][input_len:]
             llm_output = tokenizer.decode(generated_tokens, skip_special_tokens=True).strip()
 
-            aspects = extract_aspects_from_llm_output(llm_output)
-            opinions = extract_opinion_from_llm_output(llm_output)
+            pairs = extract_pairs_from_llm_output(llm_output)
+
+
+            aspects = [p[0] for p in pairs]
+            opinions = [p[1] for p in pairs]
 
             new_entry = {
                 "ID": item["ID"],
                 "Text": text,
-                "Aspect": aspects,
-                "Opinion": opinions
+                # Speichert es als Liste von Listen: [["display", "bright"], ["color gamut", "wide"]]
+                "Triplets": pairs
             }
+
             fout.write(json.dumps(new_entry, ensure_ascii=False) + "\n")
             fout.flush() # 🟢 FIX: Ensure data is written to disk immediately
 
