@@ -3,8 +3,11 @@ import argparse
 import re
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
-from tqdm import tqdm
+from tqdm import tqdm  # 🟢 Added for progress visibility
 
+# ---------------------------
+# ICL Template (Task 2)
+# ---------------------------
 ICL_PROMPT = """Below is an instruction describing a task, paired with an input that provides additional context. Your goal is to generate an output that correctly completes the task.
 
 ### Instruction:
@@ -24,50 +27,46 @@ Now complete the following example, never change the Layout described in the Out
 Input:
 """
 
-
 def build_prompt(text: str):
     """Create full ICL prompt for a given text."""
     prompt = (
-            ICL_PROMPT +
-            f"[Text] {text}\n\nOutput:"
+        ICL_PROMPT +
+        f"[Text] {text}\n\nOutput:"
     )
+    # Qwen/Llama specific chat formatting
     return f"<|user|>\n{prompt}\n<|assistant|>\n"
-
 
 def extract_pairs_from_llm_output(output_text: str):
     pattern = r'"Aspect":\s*"([^"]+)"\s*,\s*"Opinion":\s*"([^"]+)"'
     matches = re.findall(pattern, output_text)
     return matches
 
-
 def process_jsonl(model_name, input_path, output_path):
     print(f"Loading model: {model_name}")
-
+    
     tokenizer = AutoTokenizer.from_pretrained(model_name)
-
+    
+    # 🟢 FIX: Use device_map="auto" for 4-bit models. 
+    # Do NOT use .cuda() manually.
     model = AutoModelForCausalLM.from_pretrained(
-        model_name,
-        device_map="auto",
+        model_name, 
+        device_map="auto", 
         torch_dtype="auto"
     )
     model.eval()
 
     print(f"Reading input: {input_path}")
-
-    try:
-        total_lines = sum(1 for _ in open(input_path, 'r', encoding="utf-8"))
-    except FileNotFoundError:
-        print("Error: Input file not found.")
-        return
-
+    
+    # 🟢 FIX: Count lines first to setup progress bar
+    total_lines = sum(1 for _ in open(input_path, 'r', encoding="utf-8"))
+    
     print(f"Writing output: {output_path}")
 
     with open(input_path, "r", encoding="utf-8") as fin, \
-            open(output_path, "w", encoding="utf-8") as fout:
+         open(output_path, "w", encoding="utf-8") as fout:
 
+        # 🟢 FIX: Wrap in tqdm for progress bar
         for line in tqdm(fin, total=total_lines, desc="Extracting"):
-            if not line.strip(): continue
-
             item = json.loads(line)
             text = item["Text"]
 
@@ -80,7 +79,7 @@ def process_jsonl(model_name, input_path, output_path):
                     max_new_tokens=128,
                     temperature=0.1,
                     top_p=0.9,
-                    pad_token_id=tokenizer.eos_token_id
+                    pad_token_id=tokenizer.eos_token_id # 🟢 FIX: Explicitly set pad token
                 )
 
             input_len = inputs.input_ids.shape[1]
@@ -89,35 +88,35 @@ def process_jsonl(model_name, input_path, output_path):
 
             pairs = extract_pairs_from_llm_output(llm_output)
 
-            formatted_triplets = []
-            for aspect, opinion in pairs:
-                formatted_triplets.append({
-                    "Aspect": aspect.strip(),
-                    "Opinion": opinion.strip(),
-                    "VA": "0#0"  # Hartkodiert wie angefordert
-                })
+
+            aspects = [p[0] for p in pairs]
+            opinions = [p[1] for p in pairs]
 
             new_entry = {
                 "ID": item["ID"],
                 "Text": text,
-                "Triplet": formatted_triplets  # Hier ist jetzt die Liste von Dictionaries
+                # Speichert es als Liste von Listen: [["display", "bright"], ["color gamut", "wide"]]
+                "Triplets": pairs
             }
 
             fout.write(json.dumps(new_entry, ensure_ascii=False) + "\n")
-            fout.flush()
+            fout.flush() # 🟢 FIX: Ensure data is written to disk immediately
+
+            print(llm_output)
 
     print("Done.")
-
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", required=True)
     parser.add_argument("--output", required=True)
-    parser.add_argument("--model", default="unsloth/Qwen2.5-Coder-7B-Instruct-bnb-4bit")
+    parser.add_argument("--model", default="unsloth/Qwen2.5-Coder-7B-Instruct-bnb-4bit") 
+    # Note: Checked model name, assuming you meant Qwen2.5 or similar. 
+    # If "Qwen3" is a private model, keep your original string.
 
     args = parser.parse_args()
     process_jsonl(args.model, args.input, args.output)
 
-
 if __name__ == "__main__":
     main()
+
