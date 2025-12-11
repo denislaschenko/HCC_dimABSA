@@ -16,8 +16,8 @@ EPOCHS = 20
 BATCH_SIZE = 32
 MAX_LEN = 128
 PATIENCE = 2
-NUM_BINS = 81
-SIGMA = 0.3
+NUM_BINS = 9
+SIGMA = 1
 
 #Data file paths
 CONFIG_DIR = os.path.dirname(os.path.abspath(__file__))
