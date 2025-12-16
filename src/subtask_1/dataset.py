@@ -18,7 +18,13 @@ class VADataset(Dataset):
     def __init__(self, dataframe, tokenizer: PreTrainedTokenizer, max_len: int, num_bins: int, sigma: float):
         self.sentences = dataframe["Text"].tolist()
         self.aspects = dataframe["Aspect"].tolist()
-        self.labels = dataframe[["Valence", "Arousal"]].values.astype(float)
+
+        if "Valence" in dataframe.columns and "Arousal" in dataframe.columns:
+            self.labels = dataframe[["Valence", "Arousal"]].values.astype(float)
+        else:
+            import numpy as np
+            self.labels = np.zeros((len(dataframe), 2), dtype=float)
+        
         self.tokenizer = tokenizer
         self.max_len = max_len
 
