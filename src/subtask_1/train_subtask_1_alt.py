@@ -69,7 +69,7 @@ def main():
     # -----------------------------------------------
 
     if not train_raw or not predict_raw:
-        print("Error: Data loading failed (One of the datasets is empty).")
+        print("Error: Data loading failed.")
         return
 
     # 2. Process Prediction Data (Flattening Lists)
