@@ -28,7 +28,7 @@ def main():
 
     # 1. Load Data
     train_raw = utils.load_jsonl(config.TRAIN_FILE)
-    predict_raw = utils.load_jsonl(config.PREDICT_FILE)  # Output from extract_aspects.py
+    predict_raw = utils.load_jsonl("outputs/subtask_2/predictions/pred_eng_laptop.jsonl")  # Output from extract_aspects.py
 
     if not train_raw or not predict_raw:
         print("Error: Data loading failed.")
