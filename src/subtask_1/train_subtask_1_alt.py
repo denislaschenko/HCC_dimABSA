@@ -27,11 +27,49 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(config.MODEL_NAME)
 
     # 1. Load Data
+    print(f"Loading training data from: {config.TRAIN_FILE}")
     train_raw = utils.load_jsonl(config.TRAIN_FILE)
-    predict_raw = utils.load_jsonl(config.PREDICT_FILE)  # Output from extract_aspects.py
+
+    # --- UPDATED ROBUST LOADING FOR PREDICT_FILE ---
+    print(f"Loading prediction data from: {config.PREDICT_FILE}")
+    predict_raw = []
+
+    if os.path.exists(config.PREDICT_FILE):
+        try:
+            # Open with errors='replace' to avoid crashing on weird encoding issues
+            with open(config.PREDICT_FILE, 'r', encoding='utf-8', errors='replace') as f:
+                for line_num, line in enumerate(f, 1):
+                    # 1. Sanitize: Remove Null bytes (\x00) and whitespace
+                    line = line.replace('\x00', '').strip()
+
+                    # 2. Skip empty lines
+                    if not line:
+                        continue
+
+                    # 3. Skip lines that clearly aren't JSON objects (don't start with {)
+                    if not line.startswith("{"):
+                        print(f"Skipping malformed line {line_num}: {line[:30]}...")
+                        continue
+
+                    # 4. Attempt to parse
+                    try:
+                        predict_raw.append(json.loads(line))
+                    except json.JSONDecodeError:
+                        print(f"Skipping invalid JSON on line {line_num}")
+                        continue
+
+        except Exception as e:
+            print(f"Critical error reading file: {e}")
+            return
+    else:
+        print(f"Error: File not found at {config.PREDICT_FILE}")
+        return
+
+    print(f"Successfully loaded {len(predict_raw)} valid prediction samples.")
+    # -----------------------------------------------
 
     if not train_raw or not predict_raw:
-        print("Error: Data loading failed.")
+        print("Error: Data loading failed (One of the datasets is empty).")
         return
 
     # 2. Process Prediction Data (Flattening Lists)
