@@ -99,8 +99,7 @@ def process_jsonl(model_name, input_path, output_path):
                 formatted_triplets.append({
                     "Aspect": aspect.strip(),
                     "Opinion": opinion.strip(),
-                    "V": "0",
-                    "A": "0"
+                    "VA": "0#0"
                 })
 
 
