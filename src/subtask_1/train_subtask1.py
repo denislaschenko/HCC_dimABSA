@@ -3,7 +3,6 @@ import os
 
 import pandas as pd
 import torch
-import torch.nn as nn
 from torch.utils.data import DataLoader
 from transformers import AutoTokenizer, get_linear_schedule_with_warmup
 from torch.optim import AdamW
@@ -13,10 +12,9 @@ project_root = os.path.abspath(os.path.dirname(__file__))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from src.subtask_1 import config
-from src.shared import utils
-from src.subtask_1.dataset import VADataset
-from src.subtask_1.model import TransformerVARegressor
+from src.shared import utils, config
+from src.shared.dataset import VADataset
+from src.shared.model import TransformerVARegressor
 from scripts.vis.generate_results_plot import generate_plot
 
 

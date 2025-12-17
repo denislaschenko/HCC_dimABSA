@@ -6,7 +6,7 @@ import sys
 
 sys.path.append(os.getcwd())
 
-from src.subtask_1 import config
+from src.shared import config
 
 
 def plot_distributions():

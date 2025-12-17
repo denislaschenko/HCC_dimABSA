@@ -24,7 +24,6 @@ Now complete the following example, never change the Layout described in the Out
 Input:
 """
 
-
 def build_prompt(text: str):
     """Create full ICL prompt for a given text."""
     prompt = (
@@ -94,13 +93,13 @@ def process_jsonl(model_name, input_path, output_path):
                 formatted_triplets.append({
                     "Aspect": aspect.strip(),
                     "Opinion": opinion.strip(),
-                    "VA": "0#0"  # Hartkodiert wie angefordert
+                    "VA": "0#0"
                 })
 
             new_entry = {
                 "ID": item["ID"],
                 "Text": text,
-                "Triplet": formatted_triplets  # Hier ist jetzt die Liste von Dictionaries
+                "Triplet": formatted_triplets
             }
 
             fout.write(json.dumps(new_entry, ensure_ascii=False) + "\n")

@@ -2,7 +2,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import os
 
-from src.subtask_1.config import CSV_DIR, FIGURE_DIR
+from src.shared.config import CSV_DIR, FIGURE_DIR
 OUTPUT_FILE = os.path.join(FIGURE_DIR, "performance_plot.png")
 
 def generate_plot():

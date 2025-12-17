@@ -3,10 +3,9 @@ import torch
 from torch.utils.data import DataLoader
 from transformers import AutoTokenizer
 
-from src.shared import utils
-from src.subtask_1 import config
-from src.subtask_1.dataset import VADataset
-from src.subtask_1.model import TransformerVARegressor
+from src.shared import utils, config
+from src.shared.dataset import VADataset
+from src.shared.model import TransformerVARegressor
 
 model_name = config.MODEL_NAME
 dropout = 0.1
@@ -43,7 +42,7 @@ df["Predicted_Arousal"] = pred_a
 df["Resid_Valence"] = df["Valence"] - df["Predicted_Valence"]
 df["Resid_Arousal"] = df["Arousal"] - df["Predicted_Arousal"]
 
-output_file = os.path.join(config.PREDICTION_SUBDIR, "train_set_residual_analysis.jsonl")
+output_file = os.path.join(config.PREDICTION_DIR, "train_set_residual_analysis.jsonl")
 print(f"Saving results to {output_file}...")
 
 df.to_json(output_file, orient='records', lines=True)

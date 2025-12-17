@@ -3,7 +3,7 @@ import torch
 from torch.utils.data import Dataset
 from transformers import PreTrainedTokenizer
 
-from src.subtask_1 import config
+from src.shared import config
 
 
 def generate_label_distribution(target_value, min_val=1.0, max_val=9.0, num_bins=config.NUM_BINS, sigma=1.0):
@@ -14,8 +14,9 @@ def generate_label_distribution(target_value, min_val=1.0, max_val=9.0, num_bins
     return torch.tensor(probs, dtype=torch.float32)
 
 class VADataset(Dataset):
-
     def __init__(self, dataframe, tokenizer: PreTrainedTokenizer, max_len: int, num_bins: int, sigma: float):
+        if config.current_config.get("INCLUDE_OPINION"):
+            self.opinions = dataframe["Opinion"].tolist()
         self.sentences = dataframe["Text"].tolist()
         self.aspects = dataframe["Aspect"].tolist()
 
@@ -24,7 +25,7 @@ class VADataset(Dataset):
         else:
             import numpy as np
             self.labels = np.zeros((len(dataframe), 2), dtype=float)
-        
+
         self.tokenizer = tokenizer
         self.max_len = max_len
 

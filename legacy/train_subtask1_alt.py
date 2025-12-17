@@ -31,9 +31,8 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 from src.shared import utils
-from src.subtask_1.dataset import VADataset
-from src.subtask_1.model import TransformerVARegressor
-from scripts.vis import generate_results_plot
+from src.shared.dataset import VADataset
+from src.shared.model import TransformerVARegressor
 
 
 # ---------------------------------------------------------------------

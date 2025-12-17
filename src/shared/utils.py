@@ -11,7 +11,7 @@ from scipy.stats import pearsonr
 from torch import nn
 from torch.nn import functional
 
-from src.subtask_1 import config
+from src.shared import config
 
 
 class LDLLoss(nn.Module):

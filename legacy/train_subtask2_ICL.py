@@ -21,7 +21,7 @@ from src.subtask_2.icl_triplet_extractor import ICLGenerator
 from transformers import AutoTokenizer
 
 # Import your regressor class (must exist)
-from src.subtask_1.model import TransformerVARegressor
+from src.shared.model import TransformerVARegressor
 
 
 def load_jsonl(path: str) -> List[Dict]:

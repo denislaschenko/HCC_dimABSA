@@ -29,8 +29,7 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from src.subtask_1.model import TransformerVARegressor   # assumes this exists
-from src.shared import utils                                # assumes utils has helpers
+from src.shared.model import TransformerVARegressor   # assumes this exists
 
 
 # -------------------------

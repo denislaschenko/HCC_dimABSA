@@ -1,10 +1,27 @@
 import os
 
-# Task settings
-SUBTASK = "subtask_1"
-TASK = "task1"
+#Task settings
+ACTIVE_SUBTASK = "subtask_1"
 LANG = "eng"
 DOMAIN = "laptop"
+
+TASK_CONFIGS = {
+    "subtask_1": {
+        "SUBTASK": "subtask_1",
+        "TASK": "task1",
+        "INCLUDE_OPINION": False,
+        "MODEL_NAME": "roberta-base",
+        "PATIENCE": 4,
+    },
+    "subtask_2": {
+        "SUBTASK": "subtask_2",
+        "TASK": "task2",
+        "INCLUDE_OPINION": True,
+        "MODEL_NAME": "roberta-base",
+        "PATIENCE": 4,
+    }
+}
+
 
 # Model settings
 MODEL_NAME = "roberta-base"
@@ -20,6 +37,9 @@ PATIENCE = 2
 NUM_BINS = 9
 SIGMA = 1
 
+current_config = TASK_CONFIGS[ACTIVE_SUBTASK]
+globals().update(current_config)
+
 #Data file paths
 CONFIG_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(CONFIG_DIR, '..', '..'))
@@ -28,10 +48,10 @@ TRACK = "track_a"
 
 
 # Data file Path Constructor
-DATA_DIR = os.path.join(PROJECT_ROOT, DATA_ROOT, TRACK, SUBTASK, LANG)
+DATA_DIR = os.path.join(PROJECT_ROOT, DATA_ROOT, TRACK, ACTIVE_SUBTASK, LANG)
 CSV_DIR = os.path.join(PROJECT_ROOT, "outputs/subtask_1/logs/results.csv")
 TRAIN_FILE = os.path.join(DATA_DIR, f"{LANG}_{DOMAIN}_train_alltasks.jsonl")
-PREDICT_FILE = os.path.join(DATA_DIR, f"{LANG}_{DOMAIN}_dev_{TASK}.jsonl")
+PREDICT_FILE = os.path.join(DATA_DIR, f"{LANG}_{DOMAIN}_dev_{current_config.get("TASK")}.jsonl")
 FIGURE_DIR = os.path.join(PROJECT_ROOT, "outputs/subtask_1/figures")
 
 # Output settings
@@ -42,7 +62,7 @@ PREDICTION_DIR = os.path.join("outputs", "subtask_1", "predictions")
 PREDICTION_FILE = os.path.join(PREDICTION_DIR, f"pred_{LANG}_{DOMAIN}.jsonl")
 TEST_FILE = os.path.join(PREDICTION_DIR, f"test_{LANG}_{DOMAIN}.jsonl")
 
-MODEL_SAVE_PATH = os.path.join(PROJECT_ROOT, MODEL_SAVE_DIR, SUBTASK, "best_model_laptop.pt")
+MODEL_SAVE_PATH = os.path.join(PROJECT_ROOT, MODEL_SAVE_DIR, ACTIVE_SUBTASK, "best_model_laptop.pt")
 
 if __name__ == '__main__':
-    print(CONFIG_DIR + "\n" + PROJECT_ROOT + "\n" + DATA_DIR + "\n" + CSV_DIR)
+    print(PREDICT_FILE)
