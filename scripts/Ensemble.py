@@ -4,22 +4,19 @@ import numpy as np
 
 # --- CONFIGURATION ---
 PREDICTION_FILES = [
-    "predictions/subtask_1/pred_eng_laptop_1.jsonl",
-    "predictions/subtask_1/pred_eng_laptop_25.jsonl",
-    "predictions/subtask_1/pred_eng_laptop_42.jsonl",
-    "predictions/subtask_1/pred_eng_laptop_99.jsonl",
-    "predictions/subtask_1/pred_eng_laptop_123.jsonl"
+    "../outputs/subtask_1/predictions/pred_eng_laptop_1.jsonl",
+    "../outputs/subtask_1/predictions/pred_eng_laptop_42.jsonl",
+    "../outputs/subtask_1/predictions/pred_eng_laptop_100.jsonl"
 ]
 
 OUTPUT_FILE = "../outputs/subtask_1/predictions/pred_ensemble_final.jsonl"
 
 
 def load_predictions(filepath):
-    """Loads predictions from a JSONL file."""
     preds = {}
     try:
         if not os.path.exists(filepath):
-            print(f"❌ File not found: {filepath}")
+            print(f"File not found: {filepath}")
             return None
 
         with open(filepath, 'r', encoding='utf-8') as f:
@@ -29,7 +26,7 @@ def load_predictions(filepath):
         print(f"✅ Loaded {len(preds)} predictions from: {filepath}")
         return preds
     except Exception as e:
-        print(f"❌ Error reading {filepath}: {e}")
+        print(f"Error reading {filepath}: {e}")
         return None
 
 

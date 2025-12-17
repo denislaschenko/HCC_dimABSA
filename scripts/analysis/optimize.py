@@ -46,7 +46,7 @@ if __name__ == "__main__":
     print("Starting Optuna Hyperparameter Optimization...")
 
     sampler = optuna.samplers.TPESampler(
-        seed=42,
+        seed=config.SEED,
         multivariate=True,
         group=True
     )

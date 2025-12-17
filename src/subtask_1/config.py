@@ -11,6 +11,7 @@ MODEL_NAME = "roberta-base"
 MODEL_VERSION_ID = "v1.4"
 
 # Training settings
+SEED = 100
 LEARNING_RATE = 1.1796630496108734e-05
 EPOCHS = 20
 BATCH_SIZE = 32
@@ -28,8 +29,10 @@ TRACK = "track_a"
 
 # Data file Path Constructor
 DATA_DIR = os.path.join(PROJECT_ROOT, DATA_ROOT, TRACK, SUBTASK, LANG)
+CSV_DIR = os.path.join(PROJECT_ROOT, "outputs/subtask_1/logs/results.csv")
 TRAIN_FILE = os.path.join(DATA_DIR, f"{LANG}_{DOMAIN}_train_alltasks.jsonl")
 PREDICT_FILE = os.path.join(DATA_DIR, f"{LANG}_{DOMAIN}_dev_{TASK}.jsonl")
+FIGURE_DIR = os.path.join(PROJECT_ROOT, "outputs/subtask_1/figures")
 
 # Output settings
 MODEL_SAVE_DIR = os.path.join("outputs", "subtask_1", "models")
@@ -39,4 +42,7 @@ PREDICTION_DIR = os.path.join("outputs", "subtask_1", "predictions")
 PREDICTION_FILE = os.path.join(PREDICTION_DIR, f"pred_{LANG}_{DOMAIN}.jsonl")
 TEST_FILE = os.path.join(PREDICTION_DIR, f"test_{LANG}_{DOMAIN}.jsonl")
 
-MODEL_SAVE_PATH = os.path.join(PROJECT_ROOT, MODEL_SAVE_DIR, SUBTASK, "best_model.pt")
+MODEL_SAVE_PATH = os.path.join(PROJECT_ROOT, MODEL_SAVE_DIR, SUBTASK, "best_model_laptop.pt")
+
+if __name__ == '__main__':
+    print(CONFIG_DIR + "\n" + PROJECT_ROOT + "\n" + DATA_DIR + "\n" + CSV_DIR)

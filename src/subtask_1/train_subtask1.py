@@ -22,7 +22,7 @@ from scripts.vis.generate_results_plot import generate_plot
 
 def main():
     version = 3
-    utils.set_seed(42)
+    utils.set_seed(config.SEED)
 
     print(f"Using model: {config.MODEL_NAME}")
     print(f"Loading tokenizer...")
@@ -43,7 +43,7 @@ def main():
     train_df = utils.jsonl_to_df(train_raw)
     predict_df = utils.jsonl_to_df(predict_raw)
 
-    train_df, dev_df = train_test_split(train_df, test_size=0.1, random_state=42)
+    train_df, dev_df = train_test_split(train_df, test_size=0.1, random_state=config.SEED)
     print(f"Data loaded: {len(train_df)} train, {len(dev_df)} dev, {len(predict_df)} predict samples.")
 
     train_dataset = VADataset(train_df, tokenizer, max_len=config.MAX_LEN, num_bins=config.NUM_BINS, sigma=config.SIGMA)

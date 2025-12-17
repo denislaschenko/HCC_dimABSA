@@ -118,7 +118,7 @@ def main():
 
     best_val_loss = float("inf")
     epochs_no_improve = 0
-    checkpoint_path = os.path.join(args.output_dir, "best_model.pt")
+    checkpoint_path = os.path.join(args.output_dir, "best_model_laptop_42.pt")
 
     # -----------------------------------------------------------------
     # Training loop

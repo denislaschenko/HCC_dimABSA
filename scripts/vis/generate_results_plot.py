@@ -2,16 +2,14 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import os
 
-from src.subtask_1.config import DATA_DIR, PREDICTION_DIR
-
-CSV_FILE = os.path.join(DATA_DIR, "results.csv")
-OUTPUT_FILE = os.path.join(PREDICTION_DIR, "performance_plot.png")
+from src.subtask_1.config import CSV_DIR, FIGURE_DIR
+OUTPUT_FILE = os.path.join(FIGURE_DIR, "performance_plot.png")
 
 def generate_plot():
     try:
-        data = pd.read_csv(CSV_FILE)
+        data = pd.read_csv(CSV_DIR)
     except FileNotFoundError:
-        print(f"Error: Could not find results file at {CSV_FILE}")
+        print(f"Error: Could not find results file at {CSV_DIR}")
         return
 
     data['date'] = pd.to_datetime(data['date'])
@@ -32,6 +30,7 @@ def generate_plot():
 
     ax2.plot(x_labels, data['rmse_va'], '^-', label='RMSE VA (↓)', color='#e41a1c', linewidth=2, markersize=8)
     ax2.set_ylabel('RMSE Score (Lower is Better)', fontsize=12)
+    ax2.set_ylim(0.5, 2.5)
     ax2.legend(loc='upper right', fontsize=10)
     ax2.grid(True, linestyle='--', alpha=0.6)
     ax2.set_title('Error (RMSE)', fontsize=14)

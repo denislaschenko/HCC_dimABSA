@@ -2,7 +2,7 @@
 python src/subtask_2/task2_icl_regression.py \
   --input_file /data/eng_restaurant_train_alltasks.jsonl \
   --output_file data/subtask2/preds_task2.jsonl \
-  --reg_checkpoint subtask1/best_model.pt \
+  --reg_checkpoint subtask1/best_model_laptop_42.pt \
   --gen_model google/flan-t5-large \
   --reg_model_name bert-base-multilingual-cased \
   --device cuda \
