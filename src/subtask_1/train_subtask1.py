@@ -18,7 +18,7 @@ from src.shared.model import TransformerVARegressor
 from scripts.vis.generate_results_plot import generate_plot
 
 
-def main():
+def main(input: str):
     version = 3
     utils.set_seed(config.SEED)
 
@@ -32,7 +32,7 @@ def main():
 
     print(f"Loading data from: {config.TRAIN_FILE}")
     train_raw = utils.load_jsonl(config.TRAIN_FILE)
-    predict_raw = utils.load_jsonl(config.PREDICT_FILE)
+    predict_raw = utils.load_jsonl(input)
 
     if not train_raw or not predict_raw:
         print("Error: Data loading failed. Check file paths in config.py")
@@ -134,5 +134,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main(input=config.PREDICT_FILE)
 

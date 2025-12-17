@@ -4,13 +4,16 @@ import re
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
 from tqdm import tqdm
+from src.subtask_1.train_subtask1 import main as train_reg
+from src.shared import config
+
 
 ICL_PROMPT = """Below is an instruction describing a task, paired with an input that provides additional context. Your goal is to generate an output that correctly completes the task.
 
 ### Instruction:
-Given a textual instance [Text], extract all (A, O) tupels, where:
-- A is an Aspect term (a phrase describing an entity mentioned in "Text")
-- O is an Opinion term
+Given a textual instance [Text], extract all (As, Op) tuples, where:
+- As is an Aspect term (a phrase describing an entity mentioned in "Text")
+- Op is an Opinion term
 
 ### Example:
 Input:
@@ -20,9 +23,12 @@ Output:
 {"ID": "laptop_quad_dev_1", "Text": "this unit is pretty and stylish , so my high school daughter was attracted to it for that reason .", "Triplet": [{"Aspect": "unit", "Opinion": "pretty", "VA": "0#0"}, {"Aspect": "unit", "Opinion": "stylish", "VA": "0#0"}]}
 
 ### Question:
-Now complete the following example, never change the Layout described in the Output examples and always predict "VA" to be "0#0":
+Now complete the following example, never change the Layout described in the Output examples and always predict "V" and "A" to be "0":
 Input:
 """
+
+input_file = config.PREDICT_FILE
+output_file = config.PREDICTION_FILE
 
 def build_prompt(text: str):
     """Create full ICL prompt for a given text."""
@@ -93,8 +99,11 @@ def process_jsonl(model_name, input_path, output_path):
                 formatted_triplets.append({
                     "Aspect": aspect.strip(),
                     "Opinion": opinion.strip(),
-                    "VA": "0#0"
+                    "V": "0",
+                    "A": "0"
                 })
+
+
 
             new_entry = {
                 "ID": item["ID"],
@@ -107,15 +116,16 @@ def process_jsonl(model_name, input_path, output_path):
 
     print("Done.")
 
+    train_reg(output_file)
+
+
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input", required=True)
-    parser.add_argument("--output", required=True)
     parser.add_argument("--model", default="unsloth/Qwen2.5-Coder-7B-Instruct-bnb-4bit")
 
     args = parser.parse_args()
-    process_jsonl(args.model, args.input, args.output)
+    process_jsonl(args.model, input_file, output_file)
 
 
 if __name__ == "__main__":

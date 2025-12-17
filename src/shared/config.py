@@ -55,8 +55,8 @@ PREDICT_FILE = os.path.join(DATA_DIR, f"{LANG}_{DOMAIN}_dev_{current_config.get(
 FIGURE_DIR = os.path.join(PROJECT_ROOT, "outputs/subtask_1/figures")
 
 # Output settings
-MODEL_SAVE_DIR = os.path.join("outputs", "subtask_1", "models")
-PREDICTION_DIR = os.path.join("outputs", "subtask_1", "predictions")
+MODEL_SAVE_DIR = os.path.join("outputs", current_config.get("SUBTASK"), "models")
+PREDICTION_DIR = os.path.join("outputs", current_config.get("SUBTASK"), "predictions")
 
 
 PREDICTION_FILE = os.path.join(PREDICTION_DIR, f"pred_{LANG}_{DOMAIN}.jsonl")
