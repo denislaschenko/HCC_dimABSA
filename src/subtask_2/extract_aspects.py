@@ -11,9 +11,9 @@ from src.shared import config
 ICL_PROMPT = """Below is an instruction describing a task, paired with an input that provides additional context. Your goal is to generate an output that correctly completes the task.
 
 ### Instruction:
-Given a textual instance [Text], extract all (As, Op) tuples, where:
-- As is an Aspect term (a phrase describing an entity mentioned in "Text")
-- Op is an Opinion term
+Given a textual instance [Text], extract all (A, O) tuples, where:
+- A is an Aspect term (a phrase describing an entity mentioned in "Text")
+- O is an Opinion term
 
 ### Example:
 Input:
@@ -23,7 +23,7 @@ Output:
 {"ID": "laptop_quad_dev_1", "Text": "this unit is pretty and stylish , so my high school daughter was attracted to it for that reason .", "Triplet": [{"Aspect": "unit", "Opinion": "pretty", "VA": "0#0"}, {"Aspect": "unit", "Opinion": "stylish", "VA": "0#0"}]}
 
 ### Question:
-Now complete the following example, never change the Layout described in the Output examples and always predict "V" and "A" to be "0":
+Now complete the following example, never change the Layout described in the Output examples and always predict "VA" to be "0#0":
 Input:
 """
 

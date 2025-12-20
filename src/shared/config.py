@@ -11,14 +11,14 @@ TASK_CONFIGS = {
         "TASK": "task1",
         "INCLUDE_OPINION": False,
         "MODEL_NAME": "roberta-base",
-        "PATIENCE": 4,
+        "PATIENCE": 2,
     },
     "subtask_2": {
         "SUBTASK": "subtask_2",
         "TASK": "task2",
         "INCLUDE_OPINION": True,
         "MODEL_NAME": "roberta-base",
-        "PATIENCE": 4,
+        "PATIENCE": 2,
     }
 }
 
@@ -51,12 +51,12 @@ TRACK = "track_a"
 DATA_DIR = os.path.join(PROJECT_ROOT, DATA_ROOT, TRACK, ACTIVE_SUBTASK, LANG)
 CSV_DIR = os.path.join(PROJECT_ROOT, "outputs/subtask_1/logs/results.csv")
 TRAIN_FILE = os.path.join(DATA_DIR, f"{LANG}_{DOMAIN}_train_alltasks.jsonl")
-PREDICT_FILE = os.path.join(DATA_DIR, f"{LANG}_{DOMAIN}_dev_{current_config.get("TASK")}.jsonl")
+PREDICT_FILE = os.path.join(DATA_DIR, f"{LANG}_{DOMAIN}_dev_{current_config.get('TASK')}.jsonl")
 FIGURE_DIR = os.path.join(PROJECT_ROOT, "outputs/subtask_1/figures")
 
 # Output settings
-MODEL_SAVE_DIR = os.path.join("outputs", current_config.get("SUBTASK"), "models")
-PREDICTION_DIR = os.path.join("outputs", current_config.get("SUBTASK"), "predictions")
+MODEL_SAVE_DIR = os.path.join(PROJECT_ROOT, "outputs", current_config.get("SUBTASK"), "models")
+PREDICTION_DIR = os.path.join(PROJECT_ROOT, "outputs", current_config.get("SUBTASK"), "predictions")
 
 
 PREDICTION_FILE = os.path.join(PREDICTION_DIR, f"pred_{LANG}_{DOMAIN}.jsonl")
@@ -65,4 +65,4 @@ TEST_FILE = os.path.join(PREDICTION_DIR, f"test_{LANG}_{DOMAIN}.jsonl")
 MODEL_SAVE_PATH = os.path.join(PROJECT_ROOT, MODEL_SAVE_DIR, ACTIVE_SUBTASK, "best_model_laptop.pt")
 
 if __name__ == '__main__':
-    print(PREDICT_FILE)
+    print(PREDICTION_FILE)

@@ -126,7 +126,7 @@ def main(input: str):
         'rmse_va': eval_score['RMSE_VA']
     }
 
-    utils.log_results_to_csv("src/subtask_1/progress_visualization/results.csv", results_data)
+    utils.log_results_to_csv(config.CSV_DIR, results_data)
     generate_plot()
 
     utils.df_to_jsonl(predict_df, config.PREDICTION_FILE)

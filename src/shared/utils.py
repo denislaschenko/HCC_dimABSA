@@ -58,7 +58,7 @@ def jsonl_to_df(data: List[Dict]) -> pd.DataFrame:
     elif 'Triplet' in data[0]:
         df = pd.json_normalize(data, 'Triplet', ['ID', 'Text'])
         df[['Valence', 'Arousal']] = df['VA'].str.split('#', expand=True).astype(float)
-        df = df.drop(columns=['VA', 'Opinion'])
+        df = df.drop(columns=['VA'])
         df = df.drop_duplicates(subset=['ID', 'Aspect'], keep='first')
     elif 'Aspect_VA' in data[0]:
         df = pd.json_normalize(data, 'Aspect_VA', ['ID', 'Text'])
@@ -172,17 +172,31 @@ def df_to_jsonl(df: pd.DataFrame, out_path: str):
     df_sorted = df.sort_values(by="ID", key=lambda x: x.map(extract_num))
     grouped = df_sorted.groupby("ID", sort=False)
 
+    has_opinion = "Opinion" in df.columns
+
     with open(out_path, "w", encoding="utf-8") as f:
         for gid, gdf in grouped:
-            record = {
-                "ID": gid,
-                "Aspect_VA": []
-            }
-            for _, row in gdf.iterrows():
-                record["Aspect_VA"].append({
-                    "Aspect": row["Aspect"],
-                    "VA": f"{row['Valence']:.2f}#{row['Arousal']:.2f}"
-                })
+            if has_opinion:
+                record = {
+                    "ID": gid,
+                    "Triplet": []
+                }
+                for _, row in gdf.iterrows():
+                    record["Triplet"].append({
+                        "Aspect": row["Aspect"],
+                        "Opinion": row["Opinion"],
+                        "VA": f"{row['Valence']:.2f}#{row['Arousal']:.2f}"
+                    })
+            else :
+                record = {
+                   "ID": gid,
+                  "Aspect_VA": []
+                }
+                for _, row in gdf.iterrows():
+                  record["Aspect_VA"].append({
+                     "Aspect": row["Aspect"],
+                     "VA": f"{row['Valence']:.2f}#{row['Arousal']:.2f}"
+                    })
             f.write(json.dumps(record, ensure_ascii=False) + "\n")
 
 

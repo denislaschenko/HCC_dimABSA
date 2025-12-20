@@ -15,6 +15,12 @@ def generate_label_distribution(target_value, min_val=1.0, max_val=9.0, num_bins
 
 class VADataset(Dataset):
     def __init__(self, dataframe, tokenizer: PreTrainedTokenizer, max_len: int, num_bins: int, sigma: float):
+        self.tokenizer = tokenizer
+        self.max_len = max_len
+
+        self.num_bins = num_bins
+        self.sigma = sigma
+
         if config.current_config.get("INCLUDE_OPINION"):
             self.opinions = dataframe["Opinion"].tolist()
         self.sentences = dataframe["Text"].tolist()
@@ -23,30 +29,43 @@ class VADataset(Dataset):
         if "Valence" in dataframe.columns and "Arousal" in dataframe.columns:
             self.labels = dataframe[["Valence", "Arousal"]].values.astype(float)
         else:
-            import numpy as np
             self.labels = np.zeros((len(dataframe), 2), dtype=float)
 
-        self.tokenizer = tokenizer
-        self.max_len = max_len
+        aspects = dataframe["Aspect"].tolist()
+        sentences = dataframe["Text"].tolist()
 
-        self.num_bins = num_bins
-        self.sigma = sigma
+        include_opinion = config.current_config.get("INCLUDE_OPINION", False)
+        has_opinion_col = "Opinion" in dataframe.columns
 
-    def __len__(self):
-        return len(self.sentences)
+        if include_opinion and has_opinion_col:
+            opinions = dataframe["Opinion"].tolist()
+        else:
+            opinions = None
 
-    def __getitem__(self, idx):
-        # Format: "Aspect: [SEP] Text"
-        sep_token = self.tokenizer.sep_token
-        text = f"{self.aspects[idx]} {sep_token} {self.sentences[idx]}"
+        full_texts = []
+        sep = self.tokenizer.sep_token
 
-        encoded = self.tokenizer(
-            text,
+        for i in range(len(sentences)):
+            if opinions:
+                text = f"{aspects[i]} {sep} {opinions[i]} {sep} {sentences[i]}"
+            else:
+                text = f"{aspects[i]} {sep} {sentences[i]}"
+            full_texts.append(text)
+
+        print(f"Tokenizing {len(full_texts)} samples...")
+        self.encodings = self.tokenizer(
+            full_texts,
             truncation=True,
             padding="max_length",
             max_length=self.max_len,
             return_tensors="pt"
         )
+
+    def __len__(self):
+        return len(self.sentences)
+
+    def __getitem__(self, idx):
+        item = {key: val[idx] for key, val in self.encodings.items()}
 
         val_score = self.labels[idx][0]
         aro_score = self.labels[idx][1]
@@ -54,11 +73,7 @@ class VADataset(Dataset):
         val_dist = generate_label_distribution(val_score, num_bins=self.num_bins, sigma=self.sigma)
         aro_dist = generate_label_distribution(aro_score, num_bins=self.num_bins, sigma=self.sigma)
 
-        label_dist = torch.stack([val_dist, aro_dist])
+        item["labels"] = torch.stack([val_dist, aro_dist])
+        item["orig_scores"] = torch.tensor(self.labels[idx], dtype=torch.float)
 
-        return {
-            "input_ids": encoded["input_ids"].squeeze(0),
-            "attention_mask": encoded["attention_mask"].squeeze(0),
-            "labels": label_dist,
-            "orig_scores": torch.tensor(self.labels[idx], dtype=torch.float)
-        }
+        return item
