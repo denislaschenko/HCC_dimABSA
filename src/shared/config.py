@@ -20,12 +20,13 @@ TASK_CONFIGS = {
         "MODEL_NAME": "roberta-base",
         "PATIENCE": 2,
     },
-    "subtask_3": {
+   "subtask_3": {
         "SUBTASK": "subtask_3",
         "TASK": "task3",
-        "INCLUDE_OPINION": False,
-        "MODEL_NAME": "roberta-base", #fix later
-        "PATIENCE": 2
+        "INCLUDE_OPINION": True,
+        "INCLUDE_CATEGORY": True,
+        "MODEL_NAME": "roberta-base",
+        "PATIENCE": 2,
     }
 }
 
