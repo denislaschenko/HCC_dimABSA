@@ -13,6 +13,49 @@ from torch.nn import functional
 
 from src.shared import config
 
+class SupConLoss(nn.Module):
+    def __init__(self, temperature=0.07):
+        super(SupConLoss, self).__init__()
+        self.temperature = temperature
+
+    def forward(self, features, labels=None, mask=None):
+        device = features.device
+        batch_size = features.shape[0]
+
+        features = functional.normalize(features, dim=1)
+
+        anchor_dot_contrast = torch.div(
+            torch.matmul(features, features.T),
+            self.temperature
+        )
+
+        logits_max, _ = torch.max(anchor_dot_contrast, dim=1, keepdim=True)
+        logits = anchor_dot_contrast - logits_max.detach()
+
+        if mask is None:
+            if labels.dim() == 1:
+                labels = labels.contiguous().view(-1, 1)
+                mask = torch.eq(labels, labels.T).float().to(device)
+            else:
+                mask = torch.eq(labels, labels).all(dim=1).float().to(device)
+
+        logits_mask = torch.scatter(
+            torch.ones_like(mask),
+            1,
+            torch.arange(batch_size).view(-1, 1).to(device),
+            0
+        )
+        mask = mask * logits_mask
+
+        exp_logits = torch.exp(logits) * logits_mask
+        log_prob = logits - torch.log(exp_logits.sum(1, keepdim=True) + 1e-6)
+
+        mean_log_prob_pos = (mask * log_prob).sum(1) / (mask.sum(1) + 1e-6)
+
+        loss = - (self.temperature / self.base_temperature) * mean_log_prob_pos
+        loss = loss.mean()
+
+        return loss
 
 class LDLLoss(nn.Module):
     def __init__(self):
@@ -49,29 +92,33 @@ def load_jsonl(filepath: str) -> List[Dict]:
         print(f"Error: Could not decode JSON in file: {filepath}")
         return []
 
+
 def jsonl_to_df(data: List[Dict]) -> pd.DataFrame:
+    if not data:
+        return pd.DataFrame()
+
     if 'Quadruplet' in data[0]:
-        df = pd.json_normalize(data, 'Quadruplet', ['ID', 'Text'])
-        df[['Valence', 'Arousal']] = df['VA'].str.split('#', expand=True).astype(float)
-        df = df.drop(columns=['VA', 'Category', 'Opinion'])
-        df = df.drop_duplicates(subset=['ID', 'Aspect'], keep='first')
+        record_key = 'Quadruplet'
     elif 'Triplet' in data[0]:
-        df = pd.json_normalize(data, 'Triplet', ['ID', 'Text'])
-        df[['Valence', 'Arousal']] = df['VA'].str.split('#', expand=True).astype(float)
-        df = df.drop(columns=['VA'])
-        df = df.drop_duplicates(subset=['ID', 'Aspect'], keep='first')
-    elif 'Aspect_VA' in data[0]:
-        df = pd.json_normalize(data, 'Aspect_VA', ['ID', 'Text'])
-        df = df.rename(columns={df.columns[0]: "Aspect"})
-        df[['Valence', 'Arousal']] = df['VA'].str.split('#', expand=True).astype(float)
-        df = df.drop_duplicates(subset=['ID', 'Aspect'], keep='first')
+        record_key = 'Triplet'
     elif 'Aspect' in data[0]:
-        df = pd.json_normalize(data, 'Aspect', ['ID', 'Text'])
-        df = df.rename(columns={df.columns[0]: "Aspect"})
-        df['Valence'] = 0  # default value
-        df['Arousal'] = 0  # default value
+        # Fallback for simple Aspect files (if any exist without nested lists)
+        return pd.DataFrame(data).drop_duplicates(subset=['ID', 'Aspect'])
     else:
         raise ValueError("Invalid format: must include 'Quadruplet', 'Triplet', or 'Aspect'")
+
+    df = pd.json_normalize(data, record_key, ['ID', 'Text'])
+
+    df[['Valence', 'Arousal']] = df['VA'].str.split('#', expand=True).astype(float)
+
+    df = df.drop(columns=['VA', 'Category'], errors='ignore')
+
+    subset_cols = ['ID', 'Aspect']
+    if 'Opinion' in df.columns:
+        subset_cols.append('Opinion')
+
+    df = df.drop_duplicates(subset=subset_cols, keep='first')
+
     return df
 
 

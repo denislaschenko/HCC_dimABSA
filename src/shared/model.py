@@ -3,6 +3,12 @@ import torch.nn as nn
 from transformers import AutoModel
 from tqdm import tqdm
 
+from torch import nn
+from transformers import DebertaV2PreTrainedModel, DebertaV2Model
+from torch.nn import BCEWithLogitsLoss, CrossEntropyLoss
+
+from src.shared.utils import SupConLoss
+
 class TransformerVARegressor(nn.Module):
     def __init__(self, model_name: str, num_bins: int, dropout: float = 0.1):
         super().__init__()

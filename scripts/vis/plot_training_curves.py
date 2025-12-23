@@ -29,4 +29,4 @@ def plot_training_curves(train_losses, val_losses, output_dir):
     plt.savefig(save_path)
     plt.close()
 
-    print(f"📉 Loss curve saved to: {save_path}")
+    print(f"Loss curve saved to: {save_path}")

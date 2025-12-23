@@ -1,7 +1,7 @@
 import os
 
 #Task settings
-ACTIVE_SUBTASK = "subtask_1"
+ACTIVE_SUBTASK = "subtask_2"
 LANG = "eng"
 DOMAIN = "laptop"
 
@@ -19,6 +19,13 @@ TASK_CONFIGS = {
         "INCLUDE_OPINION": True,
         "MODEL_NAME": "roberta-base",
         "PATIENCE": 2,
+    },
+    "subtask_3": {
+        "SUBTASK": "subtask_3",
+        "TASK": "task3",
+        "INCLUDE_OPINION": False,
+        "MODEL_NAME": "roberta-base", #fix later
+        "PATIENCE": 2
     }
 }
 
