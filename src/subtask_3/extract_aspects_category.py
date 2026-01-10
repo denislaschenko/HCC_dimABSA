@@ -3,7 +3,7 @@ import argparse
 import re
 import torch
 import numpy as np
-from sentence_transformers import SentenceTransformer, util
+import util
 from tqdm import tqdm
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
