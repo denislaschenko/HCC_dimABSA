@@ -10,7 +10,7 @@ from src.shared import config
 
 
 def plot_distributions():
-    input_file = os.path.join(config.PREDICTION_SUBDIR, "train_set_residual_analysis.jsonl")
+    input_file = os.path.join(config.PREDICT_FILE, "train_set_residual_analysis.jsonl")
 
     if not os.path.exists(input_file):
         print(f"Error: File not found at {input_file}")

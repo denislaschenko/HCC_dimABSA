@@ -17,3 +17,5 @@ date,experiment,model,pcc_v,pcc_a,rmse_va
 2025-12-09,v2.7,roberta-base,0.9142,0.7439,1.2981
 2025-12-12,v2.8,roberta-base,0.9211,0.7623,1.1657
 2025-12-16,v2.9,roberta-base,0.9082,0.7411,0.7316
+2025-12-23,v1.4,roberta-base,0.9457,0.7851,0.6250
+2026-01-08,v1.4,roberta-base,0.9457,0.7851,0.6250

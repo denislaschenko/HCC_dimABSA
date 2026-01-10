@@ -72,4 +72,4 @@ TEST_FILE = os.path.join(PREDICTION_DIR, f"test_{LANG}_{DOMAIN}.jsonl")
 MODEL_SAVE_PATH = os.path.join(PROJECT_ROOT, MODEL_SAVE_DIR, ACTIVE_SUBTASK, "best_model_laptop.pt")
 
 if __name__ == '__main__':
-    print(PREDICTION_FILE)
+    print(DATA_DIR)

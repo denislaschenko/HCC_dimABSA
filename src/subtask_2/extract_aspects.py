@@ -9,7 +9,7 @@ from sentence_transformers import SentenceTransformer, util
 from src.subtask_1.train_subtask1 import main as train_reg
 from src.shared import config
 
-TRAIN_DATA_PATH = config.DATA_DIR
+TRAIN_DATA_PATH = config.TRAIN_FILE
 NUM_SHOTS = 3
 
 
@@ -31,6 +31,8 @@ class ExampleRetriever:
     """Handles loading training data and retrieving similar examples."""
 
     def __init__(self, train_path, model_name='all-MiniLM-L6-v2'):
+        print(f"\n[DEBUG] Initializing Retriever...")
+        print(f"[DEBUG] Target Train File: {train_path}")
         print(f"Loading retrieval model: {model_name}...")
         self.encoder = SentenceTransformer(model_name)
         self.examples = []
@@ -38,53 +40,63 @@ class ExampleRetriever:
 
         print(f"Loading reference examples from {train_path}...")
         try:
-            with open(train_path, 'r', encoding='utf-8') as f:
-                for line in f:
-                    if line.strip():
-                        self.examples.append(json.loads(line))
+          with open(train_path, 'r', encoding='UTF-8') as f:
+              raw_data = [json.loads(line) for line in f if line.strip()]
+
+          if not raw_data:
+            print("WARNING: Train file is empty.")
+            return
+
+          self.examples = []
+          for item in raw_data:
+              new_item = {
+                  "ID": str(item.get("ID")),
+                  "Text": item.get("Text"),
+                  "Triplet": []
+              }
+
+              quads = item.get("Quadruplet", [])
+              for q in quads:
+                  new_item["Triplet"].append({
+                      "Aspect": q.get("Aspect"),  # Keeps "NULL" if present
+                      "Opinion": q.get("Opinion")
+                  })
+
+              self.examples.append(new_item)
+
+          print(f"[DEBUG] SUCCESSFULLY LOADED {len(self.examples)} EXAMPLES.")
+
         except FileNotFoundError:
             print(f"WARNING: Train file {train_path} not found. RAG will fail.")
             return
 
         texts = [ex["Text"] for ex in self.examples]
-        print(f"Embedding {len(texts)} examples... (this happens once)")
+        print(f"Embedding {len(texts)} examples...")
         self.embeddings = self.encoder.encode(texts, convert_to_tensor=True)
 
     def retrieve(self, query_text, k=3):
-        """Finds k most similar examples to the query text."""
         if self.embeddings is None:
             return []
-
         query_emb = self.encoder.encode(query_text, convert_to_tensor=True)
         scores = util.cos_sim(query_emb, self.embeddings)[0]
-        top_results = torch.topk(scores, k=k)
-
-        retrieved_examples = []
-        for idx in top_results.indices:
-            retrieved_examples.append(self.examples[idx])
-
-        return retrieved_examples
+        top_results = torch.topk(scores, k=min(k, len(self.examples)))
+        return [self.examples[idx] for idx in top_results.indices]
 
 
 def build_dynamic_prompt(text: str, retrieved_examples: list):
-    """Constructs the ICL prompt using retrieved examples."""
     prompt_str = BASE_INSTRUCTION + "\n### Examples:\n"
 
     for ex in retrieved_examples:
 
-        triplets = ex.get("Triplet", [])
-
-        sanitized_triplets = []
-        for t in triplets:
-            sanitized_triplets.append({
+        clean_triplets = []
+        for t in ex["Triplet"]:
+            clean_triplets.append({
                 "Aspect": t["Aspect"],
-                "Opinion": t["Opinion"],
-                "VA": "0#0"
+                "Opinion": t["Opinion"]
             })
 
         input_json = json.dumps({"ID": ex["ID"], "Text": ex["Text"]}, ensure_ascii=False)
-        output_json = json.dumps({"ID": ex["ID"], "Text": ex["Text"], "Triplet": sanitized_triplets},
-                                 ensure_ascii=False)
+        output_json = json.dumps({"ID": ex["ID"], "Text": ex["Text"], "Triplet": clean_triplets}, ensure_ascii=False)
 
         prompt_str += f"Input:\n{input_json}\n\nOutput:\n{output_json}\n\n"
 
@@ -101,18 +113,27 @@ def extract_pairs_from_llm_output(output_text: str):
         if start != -1 and end != -1:
             json_str = output_text[start:end]
             data = json.loads(json_str)
+
             triplets = data.get("Triplet", [])
+
+            if triplets is None:
+                return []
+
             pairs = []
             for t in triplets:
-                if "Aspect" in t and "Opinion" in t:
-                    pairs.append((t["Aspect"], t["Opinion"]))
+                # Case 1: List of Dictionaries (Correct Format)
+                if isinstance(t, dict):
+                    if "Aspect" in t and "Opinion" in t:
+                        pairs.append((t["Aspect"], t["Opinion"]))
+
             return pairs
-    except json.JSONDecodeError:
+
+    except (json.JSONDecodeError, AttributeError):
         pass
 
-    pattern = r'"Aspect":\s*"([^"]+)"\s*,\s*"Opinion":\s*"([^"]+)"'
+    pattern = r'"Aspect"\s*:\s*"([^"]+)"\s*,\s*"Opinion"\s*:\s*"([^"]+)"'
     matches = re.findall(pattern, output_text)
-    return matches
+    return matches if matches else []
 
 
 def process_jsonl(model_name, input_path, output_path, train_path):
@@ -123,7 +144,7 @@ def process_jsonl(model_name, input_path, output_path, train_path):
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
         device_map="auto",
-        torch_dtype="auto"
+        dtype="auto"
     )
     model.eval()
 
@@ -143,10 +164,16 @@ def process_jsonl(model_name, input_path, output_path, train_path):
 
             item = json.loads(line)
             text = item["Text"]
+            print(f"\n---------------------------------------------------------------")
+            print(f"[DEBUG] Input Text: {text}")
 
             examples = retriever.retrieve(text, k=NUM_SHOTS)
+            print(f"[DEBUG] Retrieved {len(examples)} examples.")
+            for i, ex in enumerate(examples):
+                print(f"   Ex {i + 1}: {ex['Text'][:50]}... -> Triplets: {ex.get('Triplet', 'NONE')}")
 
             prompt = build_dynamic_prompt(text, examples)
+            print(f"[DEBUG] Full Prompt Sent to Model:\n{prompt[:500]} ... [truncated]")
 
             inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
 
@@ -163,7 +190,10 @@ def process_jsonl(model_name, input_path, output_path, train_path):
             generated_tokens = generated[0][input_len:]
             llm_output = tokenizer.decode(generated_tokens, skip_special_tokens=True).strip()
 
+            print(f"[DEBUG] RAW LLM OUTPUT: \n{llm_output}")
+
             pairs = extract_pairs_from_llm_output(llm_output)
+            print(f"[DEBUG] Extracted Pairs: {pairs}")
 
             formatted_triplets = []
             for aspect, opinion in pairs:
@@ -182,7 +212,7 @@ def process_jsonl(model_name, input_path, output_path, train_path):
             fout.write(json.dumps(new_entry, ensure_ascii=False) + "\n")
             fout.flush()
 
-    print("Done.")
+    print("Extraction Finished. Passing to regression model...")
 
     train_reg(output_file)
 
