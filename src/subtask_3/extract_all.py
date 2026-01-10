@@ -2,16 +2,24 @@ import json
 import argparse
 import re
 import torch
-import numpy as np
-import util
 from tqdm import tqdm
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from src.subtask_1.train_subtask1 import main as train_reg
 from src.shared import config
+import sys
+import os
 
+# --- COLAB-SAFE PATH FIX ---
+PROJECT_ROOT = "/content/HCC_dimABSA"
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 
+from src.subtask_1.train_subtask1 import main as train_reg
+
+# =========================
 # DOMAIN-SPECIFIC CATEGORY MAP
+# =========================
 
 ENTITY_ATTRIBUTE_MAP = {
     "restaurant": {
@@ -67,7 +75,9 @@ VALID_CATEGORIES = {
 }
 
 
+# =========================
 # ICL PROMPT
+# =========================
 
 ICL_PROMPT = f"""
 Below is an instruction describing a task.
@@ -95,40 +105,56 @@ Output:
 Now complete the following example.
 Never change the output layout.
 Always predict VA as "0#0".
-Input:
 """
 
-input_file = config.PREDICT_FILE
-output_file = config.PREDICTION_FILE
+
+def build_prompt(text: str, id_: str):
+    return f"""<|user|>
+{ICL_PROMPT}
+Input:
+{{"ID": "{id_}", "Text": "{text}"}}
+
+Output:
+<|assistant|>
+"""
 
 
-def build_prompt(text: str):
-    return f"<|user|>\n{ICL_PROMPT}[Text] {text}\n\nOutput:\n<|assistant|>\n"
-
+# =========================
+# OUTPUT PARSING (JSON SAFE)
+# =========================
 
 def extract_quads_from_llm_output(output_text: str):
-    """
-    Extract (Aspect, Category, Opinion) from model output
-    """
-    pattern = r'"Aspect":\s*"([^"]+)"\s*,\s*"Category":\s*"([^"]+)"\s*,\s*"Opinion":\s*"([^"]+)"'
-    return re.findall(pattern, output_text)
+    try:
+        data = json.loads(output_text)
+        return [
+            (q["Aspect"], q["Category"], q["Opinion"])
+            for q in data.get("Quadruplet", [])
+        ]
+    except Exception:
+        return []
 
 
 def normalize_category(category: str):
-    category = category.upper()
+    category = category.upper().replace(" ", "")
     if category in VALID_CATEGORIES:
         return category
-    # fallback heuristic
+
     if "#" in category:
         ent, attr = category.split("#", 1)
         if ent in ENTITY_SET and attr in ATTRIBUTE_SET:
-            return category
-    return "LAPTOP#MISCELLANEOUS"
+            return f"{ent}#{attr}"
+
+    # Domain-safe fallback
+    return f"{ENTITY_SET[0]}#MISCELLANEOUS"
 
 
+# =========================
+# MAIN PROCESSING
+# =========================
 
 def process_jsonl(model_name, input_path, output_path):
     print(f"Loading LLM: {model_name}")
+
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
@@ -136,6 +162,9 @@ def process_jsonl(model_name, input_path, output_path):
         torch_dtype="auto"
     )
     model.eval()
+
+    if tokenizer.pad_token_id is None:
+        tokenizer.pad_token_id = tokenizer.eos_token_id
 
     total_lines = sum(1 for _ in open(input_path, encoding="utf-8"))
     print(f"Processing {total_lines} samples")
@@ -149,9 +178,16 @@ def process_jsonl(model_name, input_path, output_path):
 
             item = json.loads(line)
             text = item["Text"]
+            sample_id = item["ID"]
 
-            prompt = build_prompt(text)
-            inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+            prompt = build_prompt(text, sample_id)
+
+            inputs = tokenizer(
+                prompt,
+                return_tensors="pt",
+                truncation=True,
+                max_length=tokenizer.model_max_length
+            ).to(model.device)
 
             with torch.no_grad():
                 output = model.generate(
@@ -159,7 +195,7 @@ def process_jsonl(model_name, input_path, output_path):
                     max_new_tokens=256,
                     temperature=0.1,
                     top_p=0.9,
-                    pad_token_id=tokenizer.eos_token_id
+                    pad_token_id=tokenizer.pad_token_id
                 )
 
             gen_text = tokenizer.decode(
@@ -169,17 +205,18 @@ def process_jsonl(model_name, input_path, output_path):
 
             quads = extract_quads_from_llm_output(gen_text)
 
-            formatted_quads = []
-            for aspect, category, opinion in quads:
-                formatted_quads.append({
-                    "Aspect": aspect.strip(),
-                    "Category": normalize_category(category),
-                    "Opinion": opinion.strip(),
+            formatted_quads = [
+                {
+                    "Aspect": a.strip(),
+                    "Category": normalize_category(c),
+                    "Opinion": o.strip(),
                     "VA": "0#0"
-                })
+                }
+                for a, c, o in quads
+            ]
 
             fout.write(json.dumps({
-                "ID": item["ID"],
+                "ID": sample_id,
                 "Quadruplet": formatted_quads
             }, ensure_ascii=False) + "\n")
 
@@ -188,6 +225,9 @@ def process_jsonl(model_name, input_path, output_path):
     train_reg(output_path)
 
 
+# =========================
+# ENTRY POINT
+# =========================
 
 def main():
     parser = argparse.ArgumentParser()
@@ -197,7 +237,7 @@ def main():
     )
     args = parser.parse_args()
 
-    process_jsonl(args.model, input_file, output_file)
+    process_jsonl(args.model, config.PREDICT_FILE, config.PREDICTION_FILE)
 
 
 if __name__ == "__main__":
