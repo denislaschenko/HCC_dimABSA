@@ -7,7 +7,12 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from src.subtask_1.train_subtask1 import main as train_reg
 from src.shared import config
+import sys
+import os
 
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 
 # =========================
 # DOMAIN-SPECIFIC CATEGORY MAP
