@@ -10,9 +10,13 @@ from src.shared import config
 import sys
 import os
 
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+# --- COLAB-SAFE PATH FIX ---
+PROJECT_ROOT = "/content/HCC_dimABSA"
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
+Then your import:
+
+from src.subtask_1.train_subtask1 import main as train_reg
 
 # =========================
 # DOMAIN-SPECIFIC CATEGORY MAP
