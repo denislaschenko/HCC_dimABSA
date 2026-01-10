@@ -3,6 +3,7 @@ import argparse
 import re
 import torch
 import numpy as np
+from requests import delete
 from tqdm import tqdm
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from sentence_transformers import SentenceTransformer, util
@@ -10,7 +11,7 @@ from src.subtask_1.train_subtask1 import main as train_reg
 from src.shared import config
 
 TRAIN_DATA_PATH = config.TRAIN_FILE
-NUM_SHOTS = 3
+NUM_SHOTS = 5
 
 
 BASE_INSTRUCTION = """Below is an instruction describing a task, paired with an input that provides additional context. Your goal is to generate an output that correctly completes the task.
@@ -28,8 +29,6 @@ output_file = config.PREDICTION_FILE
 
 
 class ExampleRetriever:
-    """Handles loading training data and retrieving similar examples."""
-
     def __init__(self, train_path, model_name='all-MiniLM-L6-v2'):
         print(f"\n[DEBUG] Initializing Retriever...")
         print(f"[DEBUG] Target Train File: {train_path}")
@@ -42,6 +41,7 @@ class ExampleRetriever:
         try:
           with open(train_path, 'r', encoding='UTF-8') as f:
               raw_data = [json.loads(line) for line in f if line.strip()]
+
 
           if not raw_data:
             print("WARNING: Train file is empty.")
@@ -57,10 +57,16 @@ class ExampleRetriever:
 
               quads = item.get("Quadruplet", [])
               for q in quads:
+                  if q.get("Aspect") == "NULL" or q.get("Opinion") == "NULL":
+                      continue
+
                   new_item["Triplet"].append({
-                      "Aspect": q.get("Aspect"),  # Keeps "NULL" if present
+                      "Aspect": q.get("Aspect"),
                       "Opinion": q.get("Opinion")
                   })
+
+              if len(new_item["Triplet"]) == 0:
+                  continue
 
               self.examples.append(new_item)
 
@@ -103,7 +109,9 @@ def build_dynamic_prompt(text: str, retrieved_examples: list):
     target_input = json.dumps({"ID": "test_id", "Text": text}, ensure_ascii=False)
     prompt_str += f"### Question:\nNow complete the following example, never change the Layout described in the Output examples and always predict \"VA\" to be \"0#0\":\nInput:\n{target_input}\n\nOutput:"
 
-    return f"<|user|>\n{prompt_str}\n<|assistant|>\n"
+    return [
+        {"role": "user", "content": prompt_str}
+    ]
 
 
 def extract_pairs_from_llm_output(output_text: str):
@@ -172,15 +180,22 @@ def process_jsonl(model_name, input_path, output_path, train_path):
             for i, ex in enumerate(examples):
                 print(f"   Ex {i + 1}: {ex['Text'][:50]}... -> Triplets: {ex.get('Triplet', 'NONE')}")
 
-            prompt = build_dynamic_prompt(text, examples)
-            print(f"[DEBUG] Full Prompt Sent to Model:\n{prompt[:500]} ... [truncated]")
+            messages = build_dynamic_prompt(text, examples)
+            print(f"[DEBUG] Full Prompt Sent to Model:\n{messages[:500]} ... [truncated]")
+
+            prompt = tokenizer.apply_chat_template(
+                messages,
+                tokenize=False,
+                add_generation_prompt=True
+            )
 
             inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
 
             with torch.no_grad():
                 generated = model.generate(
                     **inputs,
-                    max_new_tokens=256,
+                    max_new_tokens=512,
+                    do_sample=False,
                     temperature=0.1,
                     top_p=0.9,
                     pad_token_id=tokenizer.eos_token_id
