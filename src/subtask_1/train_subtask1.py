@@ -41,7 +41,7 @@ def main(input: str):
     train_df = utils.jsonl_to_df(train_raw)
     predict_df = utils.jsonl_to_df(predict_raw)
 
-    # print("DEBUG: Slicing training data to 50 samples for speed test.")
+    # # print("DEBUG: Slicing training data to 50 samples for speed test.")
     # train_df = train_df.iloc[:50]
 
     train_df, dev_df = train_test_split(train_df, test_size=0.1, random_state=config.SEED)

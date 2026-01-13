@@ -5,6 +5,8 @@
 import sys
 import os
 
+from torch.utils.data import DataLoader
+
 PROJECT_ROOT = "/content/HCC_dimABSA"
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
@@ -242,7 +244,49 @@ def process_jsonl(model_name, input_path, output_path):
 # ENTRY POINT
 # =========================
 
+def predict(model, dataloader, device, label_encoder):
+    model.eval()
+    all_preds = []
+
+    with torch.no_grad():
+        for batch in tqdm(dataloader, desc="Predicting"):
+            input_ids = batch["input_ids"].to(device)
+            attention_mask = batch["attention_mask"].to(device)
+
+            outputs = model(input_ids, attention_mask)
+            logits = outputs.logits
+
+
+            preds = torch.argmax(logits, dim=1).cpu().numpy()
+
+            decoded_preds = label_encoder.inverse_transform(preds)
+            all_preds.extend(decoded_preds)
+
+    return all_preds
+
 def main():
+    train_loader = DataLoader(config.TRAIN_FILE, batch_size=config.BATCH_SIZE, shuffle=True, num_workers=0)
+    pred_loader = DataLoader(config.PREDICT_FILE, batch_size=config.BATCH_SIZE, shuffle=False, num_workers=0)
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    label_encoder = cat_model
+
+    print("Running predictions...")
+    predictions = predict(config.current_config.get("MODEL_NAME"), pred_loader, device, label_encoder)
+
+    output_data = []
+
+    if len(predictions) != len(config.PREDICT_FILE):
+        print(f"WARNING: Mismatch! Predictions ({len(predictions)}) != Rows ({len(config.PREDICT_FILE)})")
+        print("Model was likely fed expanded samples (duplicates) from a labelled file.")
+        # Logic to handle this depends on your goal (e.g., grouping predictions by ID)
+    else:
+        for i, pred in enumerate(predictions):
+            item = config.PREDICT_FILE.iloc[i].to_dict()
+            item["Predicted_Category"] = pred
+            output_data.append(item)
+
+
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--model",

@@ -41,7 +41,8 @@ class ExampleRetriever:
         try:
           with open(train_path, 'r', encoding='UTF-8') as f:
               raw_data = [json.loads(line) for line in f if line.strip()]
-
+              # # debug speed run
+              # raw_data = raw_data[:20]
 
           if not raw_data:
             print("WARNING: Train file is empty.")
@@ -129,7 +130,6 @@ def extract_pairs_from_llm_output(output_text: str):
 
             pairs = []
             for t in triplets:
-                # Case 1: List of Dictionaries (Correct Format)
                 if isinstance(t, dict):
                     if "Aspect" in t and "Opinion" in t:
                         pairs.append((t["Aspect"], t["Opinion"]))
@@ -160,6 +160,8 @@ def process_jsonl(model_name, input_path, output_path, train_path):
     try:
         with open(input_path, 'r', encoding="utf-8") as f:
             lines = f.readlines()
+            # # debug splice
+            # lines = lines[:2]
     except FileNotFoundError:
         print("Error: Input file not found.")
         return
@@ -196,8 +198,6 @@ def process_jsonl(model_name, input_path, output_path, train_path):
                     **inputs,
                     max_new_tokens=512,
                     do_sample=False,
-                    temperature=0.1,
-                    top_p=0.9,
                     pad_token_id=tokenizer.eos_token_id
                 )
 

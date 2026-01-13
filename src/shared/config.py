@@ -1,7 +1,7 @@
 import os
 
 #Task settings
-ACTIVE_SUBTASK = "subtask_2"
+ACTIVE_SUBTASK = "subtask_3"
 LANG = "eng"
 DOMAIN = "laptop"
 

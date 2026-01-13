@@ -52,7 +52,7 @@ class SupConLoss(nn.Module):
 
         mean_log_prob_pos = (mask * log_prob).sum(1) / (mask.sum(1) + 1e-6)
 
-        loss = - (self.temperature / self.base_temperature) * mean_log_prob_pos
+        loss = - self.temperature * mean_log_prob_pos
         loss = loss.mean()
 
         return loss
@@ -98,18 +98,18 @@ def jsonl_to_df(data: List[Dict]) -> pd.DataFrame:
         return pd.DataFrame()
 
     if 'Quadruplet' in data[0]:
-        record_key = 'Quadruplet'
+        df = pd.json_normalize(data, 'Quadruplet', ['ID', 'Text'])
     elif 'Triplet' in data[0]:
-        record_key = 'Triplet'
+        df = pd.json_normalize(data, 'Triplet', ['ID', 'Text'])
     elif 'Aspect' in data[0]:
-        # Fallback for simple Aspect files (if any exist without nested lists)
-        return pd.DataFrame(data).drop_duplicates(subset=['ID', 'Aspect'])
+        df = pd.DataFrame(data)
+        if df['Aspect'].apply(lambda x: isinstance(x, list)).any():
+            df = df.explode('Aspect')
     else:
-        raise ValueError("Invalid format: must include 'Quadruplet', 'Triplet', or 'Aspect'")
+        df = pd.DataFrame(data)
 
-    df = pd.json_normalize(data, record_key, ['ID', 'Text'])
-
-    df[['Valence', 'Arousal']] = df['VA'].str.split('#', expand=True).astype(float)
+    if 'VA' in df.columns:
+        df[['Valence', 'Arousal']] = df['VA'].str.split('#', expand=True).astype(float)
 
     df = df.drop(columns=['VA', 'Category'], errors='ignore')
 
@@ -117,6 +117,7 @@ def jsonl_to_df(data: List[Dict]) -> pd.DataFrame:
     if 'Opinion' in df.columns:
         subset_cols.append('Opinion')
 
+    df = df.dropna(subset=subset_cols)
     df = df.drop_duplicates(subset=subset_cols, keep='first')
 
     return df
