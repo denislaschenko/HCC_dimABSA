@@ -19,6 +19,10 @@ from scripts.vis.generate_results_plot import generate_plot
 
 
 def main(input: str):
+    print(f"Is CUDA available? {torch.cuda.is_available()}")
+    print(f"Current Device: {torch.cuda.current_device() if torch.cuda.is_available() else 'CPU'}")
+    print(f"Torch Version: {torch.__version__}")
+
     version = 3
     utils.set_seed(config.SEED)
 
@@ -48,13 +52,13 @@ def main(input: str):
     print(f"Data loaded: {len(train_df)} train, {len(dev_df)} dev, {len(predict_df)} predict samples.")
 
     train_dataset = VADataset(train_df, tokenizer, max_len=config.MAX_LEN, num_bins=config.NUM_BINS, sigma=config.SIGMA)
-    train_loader = DataLoader(train_dataset, batch_size=config.BATCH_SIZE, shuffle=True)
+    train_loader = DataLoader(train_dataset, batch_size=config.BATCH_SIZE, shuffle=True, pin_memory=True, num_workers=0)
 
     dev_dataset = VADataset(dev_df, tokenizer, max_len=config.MAX_LEN, num_bins=config.NUM_BINS, sigma=config.SIGMA)
-    dev_loader = DataLoader(dev_dataset, batch_size=config.BATCH_SIZE, shuffle=False)
+    dev_loader = DataLoader(dev_dataset, batch_size=config.BATCH_SIZE, shuffle=False, pin_memory=True, num_workers=0)
 
     predict_dataset = VADataset(predict_df, tokenizer, max_len=config.MAX_LEN, num_bins=config.NUM_BINS, sigma=config.SIGMA)
-    predict_loader = DataLoader(predict_dataset, batch_size=config.BATCH_SIZE, shuffle=False)
+    predict_loader = DataLoader(predict_dataset, batch_size=config.BATCH_SIZE, shuffle=False, pin_memory=True, num_workers=0)
 
     model = TransformerVARegressor(model_name=config.MODEL_NAME, num_bins=config.NUM_BINS).to(device)
 

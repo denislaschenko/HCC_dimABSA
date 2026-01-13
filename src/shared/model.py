@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from torch.cuda.amp import GradScaler, autocast
 from transformers import AutoModel
 from tqdm import tqdm
 
@@ -12,7 +13,7 @@ from src.shared.utils import SupConLoss
 class TransformerVARegressor(nn.Module):
     def __init__(self, model_name: str, num_bins: int, dropout: float = 0.1):
         super().__init__()
-        self.backbone = AutoModel.from_pretrained(model_name)
+        self.backbone = AutoModel.from_pretrained(model_name, use_safetensors=True)
         self.dropout = nn.Dropout(dropout)
 
         self.v_head = nn.Linear(self.backbone.config.hidden_size, num_bins)
@@ -34,6 +35,9 @@ class TransformerVARegressor(nn.Module):
     def train_epoch(self, dataloader, optimizer, scheduler, device, loss_fn):
         self.train()
         total_loss = 0
+
+        scaler = GradScaler()
+
         for batch in tqdm(dataloader, desc="Training Epoch"):
             input_ids = batch["input_ids"].to(device)
             attention_mask = batch["attention_mask"].to(device)
@@ -42,16 +46,19 @@ class TransformerVARegressor(nn.Module):
             optimizer.zero_grad()
             #  outputs = self(input_ids, attention_mask)
             #  loss = loss_fn(outputs, labels)
-            v_logits, a_logits = self(input_ids, attention_mask)
+            with autocast():
+                v_logits, a_logits = self(input_ids, attention_mask)
 
             loss_v = loss_fn(v_logits, labels[:, 0])
             loss_a = loss_fn(a_logits, labels[:, 1])
 
             loss = loss_v + loss_a
 
-            loss.backward()
-            optimizer.step()
-            scheduler.step() # Update learning rate
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
+
+            scheduler.step()
 
             total_loss += loss.item()
         return total_loss / len(dataloader)
@@ -65,14 +72,11 @@ class TransformerVARegressor(nn.Module):
                 attention_mask = batch["attention_mask"].to(device)
                 labels = batch["labels"].to(device)
 
-                v_logits, a_logits = self(input_ids, attention_mask)
-
-                loss_v = loss_fn(v_logits, labels[:, 0])
-                loss_a = loss_fn(a_logits, labels[:, 1])
-
-                # outputs = self(input_ids, attention_mask)
-                # loss = loss_fn(outputs, labels)
-                # total_loss += loss.item()
+                with autocast():
+                    v_logits, a_logits = self(input_ids, attention_mask)
+                    loss_v = loss_fn(v_logits, labels[:, 0])
+                    loss_a = loss_fn(a_logits, labels[:, 1])
+                    loss = loss_v + loss_a
 
                 total_loss += (loss_v + loss_a).item()
         return total_loss / len(dataloader)

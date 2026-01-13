@@ -10,7 +10,7 @@ from sentence_transformers import SentenceTransformer, util
 from src.subtask_1.train_subtask1 import main as train_reg
 from src.shared import config
 
-TRAIN_DATA_PATH = config.TRAIN_FILE
+TRAIN_DATA_PATH = config.LOCAL_TRAIN_FILE
 NUM_SHOTS = 5
 
 
@@ -20,11 +20,11 @@ BASE_INSTRUCTION = """Below is an instruction describing a task, paired with an 
 Given a textual instance [Text], extract all (A, O) tuples, where:
 - A is an Aspect term (a phrase describing an entity mentioned in "Text")
 - O is an Opinion term
+- If the text states a fact that implies a positive or negative sentiment (e.g., "it is fast", "no features"), treat the factual descriptor (e.g., "fast", "no") as the Opinion.
 - You must always format the output as a valid JSON object.
-- If no relevant Aspect or Opinion exists, output an empty list for "Triplet".
 """
 
-input_file = config.PREDICT_FILE
+input_file = config.LOCAL_PREDICT_FILE
 output_file = config.PREDICTION_FILE
 
 
@@ -183,7 +183,6 @@ def process_jsonl(model_name, input_path, output_path, train_path):
                 print(f"   Ex {i + 1}: {ex['Text'][:50]}... -> Triplets: {ex.get('Triplet', 'NONE')}")
 
             messages = build_dynamic_prompt(text, examples)
-            print(f"[DEBUG] Full Prompt Sent to Model:\n{messages[:500]} ... [truncated]")
 
             prompt = tokenizer.apply_chat_template(
                 messages,

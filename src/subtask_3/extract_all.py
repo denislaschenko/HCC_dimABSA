@@ -138,7 +138,7 @@ def main():
     print("Loading Training Data (Memory Bank)...")
 
     # # debug train data for speedtest
-    train_data = load_training_data(config.TRAIN_FILE)
+    train_data = load_training_data(config.LOCAL_TRAIN_FILE)
     # train_data = train_data[:15]
 
     all_categories = sorted(list(set(d["Category"] for d in train_data)))

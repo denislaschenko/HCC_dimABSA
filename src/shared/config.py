@@ -1,7 +1,7 @@
 import os
 
 #Task settings
-ACTIVE_SUBTASK = "subtask_3"
+ACTIVE_SUBTASK = "subtask_1"
 LANG = "eng"
 DOMAIN = "laptop"
 
@@ -10,7 +10,7 @@ TASK_CONFIGS = {
         "SUBTASK": "subtask_1",
         "TASK": "task1",
         "INCLUDE_OPINION": False,
-        "MODEL_NAME": "roberta-base",
+        "MODEL_NAME": "microsoft/deberta-v3-base",
         "PATIENCE": 2,
     },
     "subtask_2": {
@@ -37,7 +37,7 @@ MODEL_VERSION_ID = "v1.4"
 
 # Training settings
 SEED = 100
-LEARNING_RATE = 1.1796630496108734e-05
+LEARNING_RATE = 6e-6
 EPOCHS = 20
 BATCH_SIZE = 32
 MAX_LEN = 128
@@ -71,6 +71,10 @@ PREDICTION_FILE = os.path.join(PREDICTION_DIR, f"pred_{LANG}_{DOMAIN}.jsonl")
 TEST_FILE = os.path.join(PREDICTION_DIR, f"test_{LANG}_{DOMAIN}.jsonl")
 
 MODEL_SAVE_PATH = os.path.join(PROJECT_ROOT, MODEL_SAVE_DIR, ACTIVE_SUBTASK, "best_model_laptop.pt")
+
+# local training
+LOCAL_TRAIN_FILE = os.path.join(DATA_DIR, "local", "local_train.jsonl")
+LOCAL_PREDICT_FILE = os.path.join(DATA_DIR, "local", "local_dev_input.jsonl")
 
 if __name__ == '__main__':
     print(DATA_DIR)
