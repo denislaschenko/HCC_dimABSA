@@ -173,8 +173,9 @@ def main():
             }, ensure_ascii=False) + "\n")
 
     print(f"\nFinished. Output written to:\n{config.PREDICTION_FILE}")
-    train_reg(output_file)
+    train_reg(config.PREDICTION_FILE)
 
 
 if __name__ == "__main__":
     main()
+
