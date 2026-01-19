@@ -1,163 +1,179 @@
 import json
 import argparse
-import re
 import torch
+from datasets import load_dataset, Dataset
+from transformers import (
+    AutoTokenizer,
+    AutoModelForCausalLM,
+    TrainingArguments,
+    EarlyStoppingCallback,
+)
+from trl import SFTTrainer
+from peft import LoraConfig, get_peft_model
 from tqdm import tqdm
-from transformers import AutoModelForCausalLM, AutoTokenizer
-from src.subtask_1.train_subtask1 import main as train_reg
+
 from src.shared import config
 
 
-# =========================
-# Config
-# =========================
-INPUT_FILE = config.LOCAL_PREDICT_FILE
-OUTPUT_FILE = config.PREDICTION_FILE
 
-
-# =========================
-# SFT Instruction Prompt
-# =========================
-BASE_INSTRUCTION = """Below is an instruction describing a task, paired with an input that provides additional context. Your goal is to generate an output that correctly completes the task.
+INSTRUCTION = """Below is an instruction describing a task, paired with an input that provides additional context.
 
 ### Instruction:
 Given a textual instance [Text], extract all (A, O) tuples, where:
-- A is an Aspect term (a phrase describing an entity mentioned in "Text")
+- A is an Aspect term
 - O is an Opinion term
-- If the text states a fact that implies sentiment (e.g., "it is fast", "no features"), treat the factual descriptor as the Opinion.
-- You must always format the output as a valid JSON object.
+- Output must be valid JSON
 """
 
-
-def build_prompt(text: str):
+def format_train_example(example):
     """
-    Build SFT-style prompt
+    Converts training jsonl → SFT text
     """
-    input_json = json.dumps(
-        {"ID": "test_id", "Text": text},
-        ensure_ascii=False
-    )
+    triplets = []
+    for q in example.get("Quadruplet", []):
+        if q.get("Aspect") != "NULL" and q.get("Opinion") != "NULL":
+            triplets.append({
+                "Aspect": q["Aspect"],
+                "Opinion": q["Opinion"]
+            })
 
     prompt = (
-        BASE_INSTRUCTION
-        + "\n### Question:\n"
-        + "Now complete the following example. "
-        + "Always output JSON in the same format and always predict \"VA\" as \"0#0\".\n"
-        + f"Input:\n{input_json}\n\nOutput:"
+        f"{INSTRUCTION}\n"
+        f"Input:\n{json.dumps({'ID': example['ID'], 'Text': example['Text']})}\n\n"
+        f"Output:\n{json.dumps({'ID': example['ID'], 'Text': example['Text'], 'Triplet': triplets})}"
     )
 
-    return [
-        {"role": "user", "content": prompt}
-    ]
+    return {"text": prompt}
 
 
-# =========================
-# Output Parsing
-# =========================
-def extract_pairs_from_llm_output(output_text: str):
-    """
-    Robustly extract (Aspect, Opinion) pairs from model output.
-    """
-    try:
-        start = output_text.find('{')
-        end = output_text.rfind('}') + 1
-        if start != -1 and end != -1:
-            data = json.loads(output_text[start:end])
-            triplets = data.get("Triplet", [])
-            if isinstance(triplets, list):
-                return [
-                    (t["Aspect"], t["Opinion"])
-                    for t in triplets
-                    if isinstance(t, dict)
-                    and "Aspect" in t
-                    and "Opinion" in t
-                ]
-    except Exception:
-        pass
-
-    # Fallback regex (last resort)
-    pattern = r'"Aspect"\s*:\s*"([^"]+)"\s*,\s*"Opinion"\s*:\s*"([^"]+)"'
-    return re.findall(pattern, output_text)
+def build_infer_prompt(text, idx):
+    return (
+        f"{INSTRUCTION}\n"
+        f"Input:\n{json.dumps({'ID': idx, 'Text': text})}\n\n"
+        f"Output:"
+    )
 
 
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--model", default="unsloth/Qwen2.5-Coder-7B-Instruct-bnb-4bit")
+    args = parser.parse_args()
 
-# process json: Aspect Opinion V#A should be 0
+   
+    # Load tokenizer + model
+ 
+    tokenizer = AutoTokenizer.from_pretrained(args.model)
+    tokenizer.pad_token = tokenizer.eos_token
 
-def process_jsonl(model_name, input_path, output_path):
-    print(f"Loading model: {model_name}")
-
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
     model = AutoModelForCausalLM.from_pretrained(
-        model_name,
+        args.model,
         device_map="auto",
-        torch_dtype="auto"
+        torch_dtype=torch.float16
     )
+
+    
+    lora_config = LoraConfig(
+        r=8,
+        lora_alpha=16,
+        target_modules=["q_proj", "k_proj", "v_proj", "o_proj"],
+        lora_dropout=0.05,
+        bias="none",
+        task_type="CAUSAL_LM",
+    )
+
+    model = get_peft_model(model, lora_config)
+
+   
+    # Load & format training data
+
+    train_raw = load_dataset(
+        "json",
+        data_files=config.LOCAL_TRAIN_FILE,
+        split="train"
+    )
+
+    train_dataset = train_raw.map(format_train_example)
+    # Trainer
+    trainer = SFTTrainer(
+        model=model,
+        tokenizer=tokenizer,
+        train_dataset=train_dataset,
+        dataset_text_field="text",
+        max_seq_length=512,
+        args=TrainingArguments(
+            per_device_train_batch_size=1,
+            gradient_accumulation_steps=4,
+            learning_rate=2e-4,
+            num_train_epochs=10,
+            logging_steps=50,
+            save_strategy="epoch",
+            evaluation_strategy="epoch",
+            load_best_model_at_end=True,
+            metric_for_best_model="loss",
+            output_dir=config.MODEL_SAVE_DIR,
+            fp16=True,
+            report_to="none",
+        ),
+        callbacks=[EarlyStoppingCallback(early_stopping_patience=config.PATIENCE)],
+    )
+
+    print("\nTraining AO SFT model...")
+    trainer.train()
+
+   
+    # Inference
+    
+    print("\n Running inference...")
     model.eval()
 
-    with open(input_path, "r", encoding="utf-8") as fin, \
-         open(output_path, "w", encoding="utf-8") as fout:
+    with open(config.LOCAL_PREDICT_FILE, "r", encoding="utf-8") as fin, \
+         open(config.PREDICTION_FILE, "w", encoding="utf-8") as fout:
 
-        for line in tqdm(fin, desc="Extracting (A, O)"):
-            if not line.strip():
-                continue
-
+        for line in tqdm(fin, desc="Predicting"):
             item = json.loads(line)
-            text = item["Text"]
-
-            messages = build_prompt(text)
-
-            prompt = tokenizer.apply_chat_template(
-                messages,
-                tokenize=False,
-                add_generation_prompt=True
-            )
+            prompt = build_infer_prompt(item["Text"], item["ID"])
 
             inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
 
             with torch.no_grad():
                 outputs = model.generate(
                     **inputs,
-                    max_new_tokens=512,
+                    max_new_tokens=256,
                     do_sample=False,
                     pad_token_id=tokenizer.eos_token_id
                 )
 
-            gen_tokens = outputs[0][inputs.input_ids.shape[1]:]
-            llm_output = tokenizer.decode(gen_tokens, skip_special_tokens=True).strip()
+            decoded = tokenizer.decode(
+                outputs[0][inputs.input_ids.shape[1]:],
+                skip_special_tokens=True
+            )
 
-            pairs = extract_pairs_from_llm_output(llm_output)
+            try:
+                start = decoded.find("{")
+                end = decoded.rfind("}") + 1
+                pred = json.loads(decoded[start:end])
+                triplets = pred.get("Triplet", [])
+            except Exception:
+                triplets = []
 
-            formatted_triplets = [
+            final_triplets = [
                 {
-                    "Aspect": a.strip(),
-                    "Opinion": o.strip(),
+                    "Aspect": t["Aspect"],
+                    "Opinion": t["Opinion"],
                     "VA": "0#0"
                 }
-                for a, o in pairs
+                for t in triplets
+                if "Aspect" in t and "Opinion" in t
             ]
 
             fout.write(json.dumps({
                 "ID": item["ID"],
-                "Text": text,
-                "Triplet": formatted_triplets
+                "Text": item["Text"],
+                "Triplet": final_triplets
             }, ensure_ascii=False) + "\n")
 
-    print("Extraction finished.")
-    print("Passing output to VA regression script...")
-
-    train_reg(output_path)
-
-
-
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--model",
-        default="unsloth/Qwen2.5-Coder-7B-Instruct-bnb-4bit",
-    )
-    args = parser.parse_args()
-
-    process_jsonl(args.model, INPUT_FILE, OUTPUT_FILE)
+    print(f"\nFinished. Output written to:\n{config.PREDICTION_FILE}")
+    train_reg(output_file)
 
 
 if __name__ == "__main__":
