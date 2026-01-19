@@ -13,6 +13,7 @@ from peft import LoraConfig, get_peft_model
 from tqdm import tqdm
 
 from src.shared import config
+from src.subtask_1.train_subtask1 import main as train_reg
 
 
 
@@ -178,4 +179,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
