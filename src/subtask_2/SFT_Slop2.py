@@ -19,7 +19,7 @@ from unsloth import FastLanguageModel
 from tqdm import tqdm
 
 # Import shared configuration
-from shared import config
+from src.shared import config
 
 # ==========================================
 # 1. Prompt Configuration (Task 2 - Tuple Approach)
