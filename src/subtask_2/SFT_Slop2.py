@@ -13,8 +13,8 @@ import re
 import argparse
 import torch
 from datasets import load_dataset
-from transformers import TrainingArguments, EarlyStoppingCallback
-from trl import SFTTrainer
+from trl import SFTTrainer, SFTConfig  # <--- Add SFTConfig here
+from transformers import EarlyStoppingCallback
 from unsloth import FastLanguageModel
 from tqdm import tqdm
 
