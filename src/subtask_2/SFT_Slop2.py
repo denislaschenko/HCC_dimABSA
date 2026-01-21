@@ -205,7 +205,6 @@ def main():
         train_dataset=train_dataset,
         eval_dataset=eval_dataset, 
         args=args,
-        max_seq_length=2048, # <--- MOVED HERE: Pass directly to Trainer for v0.11.x
         callbacks=[EarlyStoppingCallback(early_stopping_patience=subtask_cfg.get("PATIENCE", 2))],
     )
 
