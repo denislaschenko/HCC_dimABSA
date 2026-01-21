@@ -1,170 +1,213 @@
 import json
+import re
+import os
 import argparse
 import torch
 from datasets import load_dataset
-from transformers import (
-    AutoTokenizer,
-    AutoModelForCausalLM,
-    TrainingArguments,
-    EarlyStoppingCallback,
-    BitsAndBytesConfig,
-)
+from transformers import TrainingArguments, EarlyStoppingCallback
 from trl import SFTTrainer
-from peft import LoraConfig, get_peft_model
+from unsloth import FastLanguageModel
 from tqdm import tqdm
 
-# Assuming these files exist in your project structure
+# Import shared configuration
 from src.shared import config
-from src.subtask_1.train_subtask1 import main as train_reg
 
-INSTRUCTION = """Below is an instruction describing a task, paired with an input that provides additional context.
+# ==========================================
+# 1. Prompt Configuration (Task 2 - Tuple Approach)
+# ==========================================
+
+INSTRUCTION = """Below is an instruction describing a task, paired with an input that provides additional context. Your goal is to generate an output that correctly completes the task.
 
 ### Instruction:
-Given a textual instance [Text], extract all (A, O) tuples, where:
-- A is an Aspect term
+Given a textual instance [Text], extract all (A, O, VA) triplets, where:
+- A is an Aspect term (a phrase describing an entity mentioned in [Text])
 - O is an Opinion term
-- Output must be valid JSON
+- VA is a Valence–Arousal score in the format (valence#arousal)
+
+Valence ranges from 1 (negative) to 9 (positive),
+Arousal ranges from 1 (calm) to 9 (excited).
+
+### Example:
+Input:
+[Text] average to good thai food, but terrible delivery.
+
+Output:
+[Triplet] (thai food, average to good, 6.75#6.38), (delivery, terrible, 2.88#6.62)
+
+### Question:
+Now complete the following example:
+Input:
 """
 
 def format_train_example(example):
     """
-    Converts training jsonl → SFT text
+    Converts training jsonl → SFT text (Tuple Format)
     """
-    triplets = []
-    for q in example.get("Quadruplet", []):
+    text = example["Text"]
+    quads = example.get("Quadruplet", [])
+    
+    # Build Answer String (A, O, VA)
+    answer_parts = []
+    for q in quads:
         if q.get("Aspect") != "NULL" and q.get("Opinion") != "NULL":
-            triplets.append({
-                "Aspect": q["Aspect"],
-                "Opinion": q["Opinion"]
-            })
+            answer_parts.append(f"({q['Aspect']}, {q['Opinion']}, {q['VA']})")
+            
+    answer_str = ", ".join(answer_parts)
+    
+    # Construct Prompt
+    prompt = f"{INSTRUCTION}\n[Text] {text}\n\nOutput:\n"
+    return {"text": f"{prompt}\n{answer_str}"}
 
-    # Use ensure_ascii=False to keep original characters (e.g., Chinese) visible to the model
-    input_json = json.dumps({'ID': example['ID'], 'Text': example['Text']}, ensure_ascii=False)
-    output_json = json.dumps({
-        'ID': example['ID'], 
-        'Text': example['Text'], 
-        'Triplet': triplets
-    }, ensure_ascii=False)
+def build_infer_prompt(text):
+    return f"{INSTRUCTION}\n[Text] {text}\n\nOutput:\n"
 
-    prompt = (
-        f"{INSTRUCTION}\n"
-        f"Input:\n{input_json}\n\n"
-        f"Output:\n{output_json}"
-    )
+def extract_triplets_regex(decoded_text):
+    """Robust Regex extraction of (A, O, VA) tuples."""
+    result = []
+    # Pattern: (Aspect, Opinion, VA#VA)
+    pattern = r'\(([^,]+),\s*([^,]+),\s*([\d.]+#[\d.]+)\)'
+    matches = re.findall(pattern, decoded_text)
+    
+    for aspect, opinion, va in matches:
+        result.append({
+            "Aspect": aspect.strip(),
+            "Opinion": opinion.strip(),
+            "VA": va.strip()
+        })
+    return result
 
-    return {"text": prompt}
-
-
-def build_infer_prompt(text, idx):
-    input_json = json.dumps({'ID': idx, 'Text': text}, ensure_ascii=False)
-    return (
-        f"{INSTRUCTION}\n"
-        f"Input:\n{input_json}\n\n"
-        f"Output:"
-    )
-
+# ==========================================
+# 2. Main Execution
+# ==========================================
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", default="unsloth/Qwen2.5-Coder-7B-Instruct-bnb-4bit")
+    parser.add_argument("--model", default="unsloth/Qwen2.5-7B-Instruct-bnb-4bit")
+    parser.add_argument("--subtask", default="subtask_2", help="Explicitly set subtask to override global config")
     args = parser.parse_args()
 
-    # 1. Load tokenizer
-    tokenizer = AutoTokenizer.from_pretrained(args.model)
-    tokenizer.pad_token = tokenizer.eos_token
+    # --- Config Handling ---
+    # We explicitly look up the config for the subtask we want to run.
+    # This prevents errors if the global config is set to 'subtask_1'.
+    task_key = args.subtask
+    if task_key not in config.TASK_CONFIGS:
+        raise ValueError(f"Task {task_key} not found in config TASK_CONFIGS")
+        
+    subtask_cfg = config.TASK_CONFIGS[task_key]
+    SUBTASK_NAME = subtask_cfg["SUBTASK"] # e.g., "subtask_2"
+    
+    print(f"Running for: {SUBTASK_NAME} (Domain: {config.DOMAIN}, Lang: {config.LANG})")
 
-    # 2. Load Model with Quantization Config (Mistake Fix)
-    # Explicitly define 4-bit quantization config to ensure correct loading
-    bnb_config = BitsAndBytesConfig(
+    # --- Path Construction ---
+    # Reconstruct paths based on the specific SUBTASK_NAME, ignoring the global DATA_DIR
+    DATA_BASE_DIR = os.path.join(config.PROJECT_ROOT, "task-dataset", "track_a", SUBTASK_NAME, config.LANG)
+    
+    # Define Model and Output directories based on the specific subtask
+    MODEL_SAVE_DIR = os.path.join(config.PROJECT_ROOT, "outputs", SUBTASK_NAME, "models")
+    PREDICTION_DIR = os.path.join(config.PROJECT_ROOT, "outputs", SUBTASK_NAME, "predictions")
+    
+    # Construct file paths
+    local_train_path = os.path.join(DATA_BASE_DIR, "local", "local_train.jsonl")
+    standard_train_path = os.path.join(DATA_BASE_DIR, f"{config.LANG}_{config.DOMAIN}_train_alltasks.jsonl")
+    
+    # Select training path (prefer local if exists)
+    train_path = local_train_path if os.path.exists(local_train_path) else standard_train_path
+    
+    # Select inference path
+    infer_path = os.path.join(DATA_BASE_DIR, "local", "local_dev_input.jsonl")
+    if not os.path.exists(infer_path):
+        # Fallback to standard predict file if local doesn't exist
+        infer_path = os.path.join(DATA_BASE_DIR, f"{config.LANG}_{config.DOMAIN}_dev_task2.jsonl")
+
+    print(f"Training Data: {train_path}")
+    print(f"Inference Input: {infer_path}")
+    print(f"Model Save Dir: {MODEL_SAVE_DIR}")
+
+    # --- Load Model (Unsloth) ---
+    print(f"Loading model: {args.model}...")
+    model, tokenizer = FastLanguageModel.from_pretrained(
+        model_name=args.model,
+        max_seq_length=2048, 
         load_in_4bit=True,
-        bnb_4bit_quant_type="nf4",
-        bnb_4bit_compute_dtype=torch.float16,
-        bnb_4bit_use_double_quant=True,
     )
 
-    model = AutoModelForCausalLM.from_pretrained(
-        args.model,
-        quantization_config=bnb_config,
-        device_map="auto",
-        torch_dtype=torch.float16
-    )
-
-    # 3. Disable cache for training (Mistake Fix)
-    # Required when using gradient checkpointing or peft to avoid warnings/errors
-    model.config.use_cache = False
-
-    # 4. LoRA Config
-    lora_config = LoraConfig(
-        r=8,
+    # --- LoRA Config (Unsloth) ---
+    model = FastLanguageModel.get_peft_model(
+        model,
+        r=16,
         lora_alpha=16,
-        target_modules=["q_proj", "k_proj", "v_proj", "o_proj"],
         lora_dropout=0.05,
+        target_modules=["q_proj", "k_proj", "v_proj", "o_proj"],
         bias="none",
-        task_type="CAUSAL_LM",
+        use_gradient_checkpointing=True,
+        random_state=config.SEED,
     )
 
-    model = get_peft_model(model, lora_config)
+    # --- Load & Split Data ---
+    if not os.path.exists(train_path):
+        raise FileNotFoundError(f"Training file not found: {train_path}")
 
-    # 5. Load & Split Data (Mistake Fix)
-    # Loading data
-    train_raw = load_dataset(
-        "json",
-        data_files=config.TRAIN_FILE, 
-        split="train"
-    )
+    train_raw = load_dataset("json", data_files=train_path, split="train")
 
-    # Create a validation split to support evaluation_strategy and EarlyStopping
-    split_dataset = train_raw.train_test_split(test_size=0.1) # 10% for validation
+    # Create a validation split
+    split_dataset = train_raw.train_test_split(test_size=0.1)
     train_dataset = split_dataset["train"].map(format_train_example)
     eval_dataset = split_dataset["test"].map(format_train_example)
 
-    # 6. Trainer
+    # --- Trainer ---
     trainer = SFTTrainer(
         model=model,
         tokenizer=tokenizer,
         train_dataset=train_dataset,
-        eval_dataset=eval_dataset, # Pass eval_dataset here
+        eval_dataset=eval_dataset, 
         dataset_text_field="text",
-        max_seq_length=512,
+        max_seq_length=2048,
         args=TrainingArguments(
             per_device_train_batch_size=1,
             gradient_accumulation_steps=4,
             learning_rate=2e-4,
-            num_train_epochs=10,
-            logging_steps=50,
+            num_train_epochs=config.EPOCHS if config.EPOCHS < 5 else 3,
+            logging_steps=10,
             save_strategy="epoch",
             evaluation_strategy="epoch",
             load_best_model_at_end=True,
             metric_for_best_model="loss",
-            greater_is_better=False, # Loss should be minimized
-            output_dir=config.MODEL_SAVE_DIR,
-            fp16=True, # fp16 is generally redundant with load_in_4bit, but kept for compatibility
+            greater_is_better=False,
+            output_dir=MODEL_SAVE_DIR,
+            fp16=not torch.cuda.is_bf16_supported(),
+            bf16=torch.cuda.is_bf16_supported(),
+            optim="adamw_8bit",
             report_to="none",
         ),
-        callbacks=[EarlyStoppingCallback(early_stopping_patience=config.PATIENCE)],
+        callbacks=[EarlyStoppingCallback(early_stopping_patience=subtask_cfg.get("PATIENCE", 2))],
     )
 
     print("\nTraining AO SFT model...")
     trainer.train()
 
-    # 7. Inference
+    # --- Inference ---
     print("\nRunning inference...")
-    model.eval()
+    FastLanguageModel.for_inference(model)
 
-    with open(config.PREDICT_FILE, "r", encoding="utf-8") as fin, \
-         open(config.PREDICTION_FILE, "w", encoding="utf-8") as fout:
+    os.makedirs(PREDICTION_DIR, exist_ok=True)
+    
+    # Set Output File name
+    output_file = os.path.join(PREDICTION_DIR, f"pred_{config.LANG}_{config.DOMAIN}.jsonl")
+
+    with open(infer_path, "r", encoding="utf-8") as fin, \
+         open(output_file, "w", encoding="utf-8") as fout:
 
         for line in tqdm(fin, desc="Predicting"):
             item = json.loads(line)
-            prompt = build_infer_prompt(item["Text"], item["ID"])
+            prompt = build_infer_prompt(item["Text"])
 
-            inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=512).to(model.device)
+            inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=2048).to(model.device)
 
             with torch.no_grad():
                 outputs = model.generate(
                     **inputs,
                     max_new_tokens=256,
-                    do_sample=False,
+                    do_sample=False, 
                     pad_token_id=tokenizer.eos_token_id
                 )
 
@@ -173,43 +216,23 @@ def main():
                 skip_special_tokens=True
             )
 
-            try:
-                start = decoded.find("{")
-                end = decoded.rfind("}") + 1
-                
-                if start != -1 and end > start:
-                    json_str = decoded[start:end]
-                    pred = json.loads(json_str)
-                    triplets = pred.get("Triplet", [])
-                else:
-                    triplets = []
-            except Exception as e:
-                print(f"Error parsing JSON for ID {item['ID']}: {e}")
-                triplets = []
-
-            final_triplets = [
-                {
-                    "Aspect": t["Aspect"],
-                    "Opinion": t["Opinion"],
-                    "VA": "0#0"
-                }
-                for t in triplets
-                if "Aspect" in t and "Opinion" in t
-            ]
+            # Use Regex extraction
+            triplets = extract_triplets_regex(decoded)
 
             fout.write(json.dumps({
                 "ID": item["ID"],
                 "Text": item["Text"],
-                "Triplet": final_triplets
+                "Triplet": triplets
             }, ensure_ascii=False) + "\n")
 
-    print(f"\nFinished. Output written to:\n{config.PREDICTION_FILE}")
-    train_reg(config.PREDICTION_FILE)
-
+    print(f"\nFinished. Output written to:\n{output_file}")
+    
+    
+    from src.subtask_1.train_subtask1 import main as train_reg
+    train_reg(output_file)
 
 if __name__ == "__main__":
     main()
-
 
 
 
