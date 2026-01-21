@@ -171,14 +171,14 @@ def main():
     eval_dataset = split_dataset["test"].map(format_train_example)
 
     # --- Trainer ---
-    # --- Trainer ---
+        # --- Trainer ---
     os.makedirs(MODEL_SAVE_DIR, exist_ok=True)
 
-    # Fix tokenizer pad/eos issues before training
+    # Fix tokenizer pad/eos issues before config
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
-    # SFTConfig for v0.11.x (Does NOT accept max_seq_length)
+    # SFTConfig
     args = SFTConfig(
         per_device_train_batch_size=1,
         gradient_accumulation_steps=4,
@@ -197,11 +197,12 @@ def main():
         report_to="none",
         dataset_text_field="text",
         packing=False,
+        eos_token_id=tokenizer.eos_token_id, # <--- CRITICAL: Override the default bad EOS token
     )
 
     trainer = SFTTrainer(
         model=model,
-        processing_class=tokenizer,
+        processing_class=tokenizer, 
         train_dataset=train_dataset,
         eval_dataset=eval_dataset, 
         args=args,
@@ -211,6 +212,7 @@ def main():
     # --- Start Training ---
     print("\nTraining AO SFT model...")
     trainer.train()
+
 
     # --- Inference ---
     print("\nRunning inference...")
