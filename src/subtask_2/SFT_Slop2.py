@@ -178,7 +178,6 @@ def main():
         train_dataset=train_dataset,
         eval_dataset=eval_dataset, 
         dataset_text_field="text",
-        max_seq_length=2048,
         args=TrainingArguments(
             per_device_train_batch_size=1,
             gradient_accumulation_steps=4,
