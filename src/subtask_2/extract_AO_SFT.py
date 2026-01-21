@@ -109,7 +109,7 @@ def main():
     # Loading data
     train_raw = load_dataset(
         "json",
-        data_files=config.LOCAL_TRAIN_FILE,
+        data_files=config.TRAIN_FILE, 
         split="train"
     )
 
@@ -151,7 +151,7 @@ def main():
     print("\nRunning inference...")
     model.eval()
 
-    with open(config.LOCAL_PREDICT_FILE, "r", encoding="utf-8") as fin, \
+    with open(config.PREDICT_FILE, "r", encoding="utf-8") as fin, \
          open(config.PREDICTION_FILE, "w", encoding="utf-8") as fout:
 
         for line in tqdm(fin, desc="Predicting"):
@@ -209,6 +209,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
