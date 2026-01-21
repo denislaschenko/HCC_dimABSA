@@ -196,7 +196,7 @@ def main():
         optim="adamw_8bit",
         report_to="none",
         dataset_text_field="text",
-        packing=False,
+        packing=True,
     )
 
     # --- CRITICAL FIX ---
