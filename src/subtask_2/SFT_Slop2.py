@@ -196,7 +196,7 @@ def main():
 
     trainer = SFTTrainer(
         model=model,
-        # tokenizer is automatically inferred from the model
+        processing_class=tokenizer,
         # max_seq_length is controlled by the model/tokenizer
         train_dataset=train_dataset,
         eval_dataset=eval_dataset, 
