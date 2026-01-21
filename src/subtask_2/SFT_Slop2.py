@@ -171,7 +171,7 @@ def main():
     eval_dataset = split_dataset["test"].map(format_train_example)
 
     # --- Trainer ---
-        # --- Trainer ---
+    # --- Trainer ---
     os.makedirs(MODEL_SAVE_DIR, exist_ok=True)
 
     # Fix tokenizer pad/eos issues before config
@@ -197,8 +197,12 @@ def main():
         report_to="none",
         dataset_text_field="text",
         packing=False,
-        eos_token_id=tokenizer.eos_token_id, # <--- CRITICAL: Override the default bad EOS token
     )
+
+    # --- CRITICAL FIX ---
+    # The library version has a bug: it requires eos_token_id but rejects it in __init__.
+    # We manually patch the config object to override the bad default ('<EOS_TOKEN>').
+    args.eos_token_id = tokenizer.eos_token_id
 
     trainer = SFTTrainer(
         model=model,
@@ -212,7 +216,6 @@ def main():
     # --- Start Training ---
     print("\nTraining AO SFT model...")
     trainer.train()
-
 
     # --- Inference ---
     print("\nRunning inference...")
