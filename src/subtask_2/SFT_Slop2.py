@@ -171,9 +171,14 @@ def main():
     eval_dataset = split_dataset["test"].map(format_train_example)
 
     # --- Trainer ---
+    # --- Trainer ---
     os.makedirs(MODEL_SAVE_DIR, exist_ok=True)
 
-    # Use SFTConfig instead of TrainingArguments
+    # Fix tokenizer pad/eos issues before training
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+
+    # SFTConfig for v0.11.x (Does NOT accept max_seq_length)
     args = SFTConfig(
         per_device_train_batch_size=1,
         gradient_accumulation_steps=4,
@@ -190,22 +195,21 @@ def main():
         bf16=torch.cuda.is_bf16_supported(),
         optim="adamw_8bit",
         report_to="none",
-        dataset_text_field="text",  # <--- MOVED HERE
-        packing=False, 
-        max_seq_length=2048, # Re-added: Required when packing=False
-        eos_token_id=tokenizer.eos_token_id,
+        dataset_text_field="text",
+        packing=False,
     )
 
     trainer = SFTTrainer(
         model=model,
         processing_class=tokenizer,
-        # max_seq_length is controlled by the model/tokenizer
         train_dataset=train_dataset,
         eval_dataset=eval_dataset, 
-        args=args, # Pass the SFTConfig here
+        args=args,
+        max_seq_length=2048, # <--- MOVED HERE: Pass directly to Trainer for v0.11.x
         callbacks=[EarlyStoppingCallback(early_stopping_patience=subtask_cfg.get("PATIENCE", 2))],
     )
 
+    # --- Start Training ---
     print("\nTraining AO SFT model...")
     trainer.train()
 
