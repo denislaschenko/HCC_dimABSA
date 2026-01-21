@@ -173,28 +173,34 @@ def main():
     # --- Trainer ---
     os.makedirs(MODEL_SAVE_DIR, exist_ok=True)
 
+    # Use SFTConfig instead of TrainingArguments
+    args = SFTConfig(
+        per_device_train_batch_size=1,
+        gradient_accumulation_steps=4,
+        learning_rate=2e-4,
+        num_train_epochs=config.EPOCHS if config.EPOCHS < 5 else 3,
+        logging_steps=10,
+        save_strategy="epoch",
+        eval_strategy="epoch",
+        load_best_model_at_end=True,
+        metric_for_best_model="loss",
+        greater_is_better=False,
+        output_dir=MODEL_SAVE_DIR,
+        fp16=not torch.cuda.is_bf16_supported(),
+        bf16=torch.cuda.is_bf16_supported(),
+        optim="adamw_8bit",
+        report_to="none",
+        dataset_text_field="text",  # <--- MOVED HERE
+        # packing=True, # Optional: use this if you want better efficiency with short texts
+    )
+
     trainer = SFTTrainer(
         model=model,
+        # tokenizer is automatically inferred from the model
+        # max_seq_length is controlled by the model/tokenizer
         train_dataset=train_dataset,
         eval_dataset=eval_dataset, 
-        dataset_text_field="text",
-        args=TrainingArguments(
-            per_device_train_batch_size=1,
-            gradient_accumulation_steps=4,
-            learning_rate=2e-4,
-            num_train_epochs=config.EPOCHS if config.EPOCHS < 5 else 3,
-            logging_steps=10,
-            save_strategy="epoch",
-            eval_strategy="epoch",
-            load_best_model_at_end=True,
-            metric_for_best_model="loss",
-            greater_is_better=False,
-            output_dir=MODEL_SAVE_DIR,
-            fp16=not torch.cuda.is_bf16_supported(),
-            bf16=torch.cuda.is_bf16_supported(),
-            optim="adamw_8bit",
-            report_to="none",
-        ),
+        args=args, # Pass the SFTConfig here
         callbacks=[EarlyStoppingCallback(early_stopping_patience=subtask_cfg.get("PATIENCE", 2))],
     )
 
