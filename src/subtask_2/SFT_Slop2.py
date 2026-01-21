@@ -1,3 +1,13 @@
+import sys
+
+# Get the directory where this script is located
+current_path = os.path.dirname(os.path.abspath(__file__))
+
+# Go up two levels to reach the project root (src/subtask_2 -> src -> Root)
+project_root = os.path.abspath(os.path.join(current_path, "../.."))
+
+# Add the root to the system path so Python can find 'src'
+sys.path.insert(0, project_root)
 import json
 import re
 import os
