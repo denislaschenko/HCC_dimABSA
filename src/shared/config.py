@@ -72,9 +72,5 @@ TEST_FILE = os.path.join(PREDICTION_DIR, f"test_{LANG}_{DOMAIN}.jsonl")
 
 MODEL_SAVE_PATH = os.path.join(PROJECT_ROOT, MODEL_SAVE_DIR, ACTIVE_SUBTASK, "best_model_laptop.pt")
 
-# local training
-LOCAL_TRAIN_FILE = os.path.join(DATA_DIR, "local", "local_train.jsonl")
-LOCAL_PREDICT_FILE = os.path.join(DATA_DIR, "local", "local_dev_input.jsonl")
-
 if __name__ == '__main__':
     print(DATA_DIR)
