@@ -17,6 +17,7 @@ from src.shared.dataset import VADataset
 from src.shared.model import TransformerVARegressor
 from scripts.vis.generate_results_plot import generate_plot
 
+# 'test'
 
 def main(input: str):
     print(f"Is CUDA available? {torch.cuda.is_available()}")
