@@ -1,21 +1,21 @@
 import json
 import argparse
 import torch
-from datasets import load_dataset, Dataset
+from datasets import load_dataset
 from transformers import (
     AutoTokenizer,
     AutoModelForCausalLM,
     TrainingArguments,
     EarlyStoppingCallback,
+    BitsAndBytesConfig,
 )
 from trl import SFTTrainer
 from peft import LoraConfig, get_peft_model
 from tqdm import tqdm
 
+# Assuming these files exist in your project structure
 from src.shared import config
 from src.subtask_1.train_subtask1 import main as train_reg
-
-
 
 INSTRUCTION = """Below is an instruction describing a task, paired with an input that provides additional context.
 
@@ -38,19 +38,28 @@ def format_train_example(example):
                 "Opinion": q["Opinion"]
             })
 
+    # Use ensure_ascii=False to keep original characters (e.g., Chinese) visible to the model
+    input_json = json.dumps({'ID': example['ID'], 'Text': example['Text']}, ensure_ascii=False)
+    output_json = json.dumps({
+        'ID': example['ID'], 
+        'Text': example['Text'], 
+        'Triplet': triplets
+    }, ensure_ascii=False)
+
     prompt = (
         f"{INSTRUCTION}\n"
-        f"Input:\n{json.dumps({'ID': example['ID'], 'Text': example['Text']})}\n\n"
-        f"Output:\n{json.dumps({'ID': example['ID'], 'Text': example['Text'], 'Triplet': triplets})}"
+        f"Input:\n{input_json}\n\n"
+        f"Output:\n{output_json}"
     )
 
     return {"text": prompt}
 
 
 def build_infer_prompt(text, idx):
+    input_json = json.dumps({'ID': idx, 'Text': text}, ensure_ascii=False)
     return (
         f"{INSTRUCTION}\n"
-        f"Input:\n{json.dumps({'ID': idx, 'Text': text})}\n\n"
+        f"Input:\n{input_json}\n\n"
         f"Output:"
     )
 
@@ -60,19 +69,31 @@ def main():
     parser.add_argument("--model", default="unsloth/Qwen2.5-Coder-7B-Instruct-bnb-4bit")
     args = parser.parse_args()
 
-   
-    # Load tokenizer + model
- 
+    # 1. Load tokenizer
     tokenizer = AutoTokenizer.from_pretrained(args.model)
     tokenizer.pad_token = tokenizer.eos_token
 
+    # 2. Load Model with Quantization Config (Mistake Fix)
+    # Explicitly define 4-bit quantization config to ensure correct loading
+    bnb_config = BitsAndBytesConfig(
+        load_in_4bit=True,
+        bnb_4bit_quant_type="nf4",
+        bnb_4bit_compute_dtype=torch.float16,
+        bnb_4bit_use_double_quant=True,
+    )
+
     model = AutoModelForCausalLM.from_pretrained(
         args.model,
+        quantization_config=bnb_config,
         device_map="auto",
         torch_dtype=torch.float16
     )
 
-    
+    # 3. Disable cache for training (Mistake Fix)
+    # Required when using gradient checkpointing or peft to avoid warnings/errors
+    model.config.use_cache = False
+
+    # 4. LoRA Config
     lora_config = LoraConfig(
         r=8,
         lora_alpha=16,
@@ -84,21 +105,25 @@ def main():
 
     model = get_peft_model(model, lora_config)
 
-   
-    # Load & format training data
-
+    # 5. Load & Split Data (Mistake Fix)
+    # Loading data
     train_raw = load_dataset(
         "json",
         data_files=config.LOCAL_TRAIN_FILE,
         split="train"
     )
 
-    train_dataset = train_raw.map(format_train_example)
-    # Trainer
+    # Create a validation split to support evaluation_strategy and EarlyStopping
+    split_dataset = train_raw.train_test_split(test_size=0.1) # 10% for validation
+    train_dataset = split_dataset["train"].map(format_train_example)
+    eval_dataset = split_dataset["test"].map(format_train_example)
+
+    # 6. Trainer
     trainer = SFTTrainer(
         model=model,
         tokenizer=tokenizer,
         train_dataset=train_dataset,
+        eval_dataset=eval_dataset, # Pass eval_dataset here
         dataset_text_field="text",
         max_seq_length=512,
         args=TrainingArguments(
@@ -111,8 +136,9 @@ def main():
             evaluation_strategy="epoch",
             load_best_model_at_end=True,
             metric_for_best_model="loss",
+            greater_is_better=False, # Loss should be minimized
             output_dir=config.MODEL_SAVE_DIR,
-            fp16=True,
+            fp16=True, # fp16 is generally redundant with load_in_4bit, but kept for compatibility
             report_to="none",
         ),
         callbacks=[EarlyStoppingCallback(early_stopping_patience=config.PATIENCE)],
@@ -121,10 +147,8 @@ def main():
     print("\nTraining AO SFT model...")
     trainer.train()
 
-   
-    # Inference
-    
-    print("\n Running inference...")
+    # 7. Inference
+    print("\nRunning inference...")
     model.eval()
 
     with open(config.LOCAL_PREDICT_FILE, "r", encoding="utf-8") as fin, \
@@ -134,7 +158,7 @@ def main():
             item = json.loads(line)
             prompt = build_infer_prompt(item["Text"], item["ID"])
 
-            inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+            inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=512).to(model.device)
 
             with torch.no_grad():
                 outputs = model.generate(
@@ -152,9 +176,15 @@ def main():
             try:
                 start = decoded.find("{")
                 end = decoded.rfind("}") + 1
-                pred = json.loads(decoded[start:end])
-                triplets = pred.get("Triplet", [])
-            except Exception:
+                
+                if start != -1 and end > start:
+                    json_str = decoded[start:end]
+                    pred = json.loads(json_str)
+                    triplets = pred.get("Triplet", [])
+                else:
+                    triplets = []
+            except Exception as e:
+                print(f"Error parsing JSON for ID {item['ID']}: {e}")
                 triplets = []
 
             final_triplets = [
@@ -179,5 +209,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
