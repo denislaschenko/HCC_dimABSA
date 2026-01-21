@@ -191,7 +191,9 @@ def main():
         optim="adamw_8bit",
         report_to="none",
         dataset_text_field="text",  # <--- MOVED HERE
-        # packing=True, # Optional: use this if you want better efficiency with short texts
+        packing=False, 
+        max_seq_length=2048, # Re-added: Required when packing=False
+        eos_token_id=tokenizer.eos_token_id,
     )
 
     trainer = SFTTrainer(
