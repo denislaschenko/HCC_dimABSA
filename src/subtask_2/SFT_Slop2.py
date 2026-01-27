@@ -1,6 +1,5 @@
 import sys
 import os
-
 # Get the directory where this script is located
 current_path = os.path.dirname(os.path.abspath(__file__))
 
@@ -9,21 +8,14 @@ project_root = os.path.abspath(os.path.join(current_path, "../.."))
 
 # Add the root to the system path so Python can find 'src'
 sys.path.insert(0, project_root)
-
 import json
 import re
 import argparse
 import torch
 from datasets import load_dataset
-from transformers import (
-    AutoModelForCausalLM,
-    AutoTokenizer,
-    TrainingArguments,
-    EarlyStoppingCallback,
-    BitsAndBytesConfig,
-)
-from peft import LoraConfig, get_peft_model
-from trl import SFTTrainer
+from trl import SFTTrainer, SFTConfig  # <--- Add SFTConfig here
+from transformers import EarlyStoppingCallback
+from unsloth import FastLanguageModel
 from tqdm import tqdm
 
 # Import shared configuration
@@ -99,11 +91,12 @@ def extract_triplets_regex(decoded_text):
 
 def main():
     parser = argparse.ArgumentParser()
-    # Using a standard Qwen model
-    parser.add_argument("--model", default="Qwen/Qwen2.5-7B-Instruct")
+    parser.add_argument("--model", default="unsloth/Qwen2.5-7B-Instruct-bnb-4bit")
     args = parser.parse_args()
 
     # --- Config Handling ---
+    # We explicitly target 'subtask_2' for Task 2 (A, O, VA)
+    # This ensures paths are correct even if global ACTIVE_SUBTASK is 'subtask_1'
     SUBTASK_NAME = "subtask_2"
     TASK_NAME = "task2"
     
@@ -114,7 +107,8 @@ def main():
     
     print(f"Running for: {SUBTASK_NAME} (Domain: {config.DOMAIN}, Lang: {config.LANG})")
 
-    # --- Path Construction ---
+    # --- Path Construction (Based on config.py logic) ---
+    # 1. Data Directory: task-dataset/track_a/subtask_2/eng
     DATA_DIR = os.path.join(
         config.PROJECT_ROOT, 
         "task-dataset", 
@@ -123,15 +117,19 @@ def main():
         config.LANG
     )
     
+    # 2. Output Directories
     MODEL_SAVE_DIR = os.path.join(config.PROJECT_ROOT, "outputs", SUBTASK_NAME, "models")
     PREDICTION_DIR = os.path.join(config.PROJECT_ROOT, "outputs", SUBTASK_NAME, "predictions")
     
+    # 3. File Paths
     TRAIN_FILE = os.path.join(DATA_DIR, f"{config.LANG}_{config.DOMAIN}_train_alltasks.jsonl")
     PREDICT_FILE = os.path.join(DATA_DIR, f"{config.LANG}_{config.DOMAIN}_dev_{TASK_NAME}.jsonl")
     
+    # Verify files exist
     if not os.path.exists(TRAIN_FILE):
         raise FileNotFoundError(f"Training file not found: {TRAIN_FILE}")
     if not os.path.exists(PREDICT_FILE):
+        # Fallback for test file if dev file missing
         print(f"Dev file not found at {PREDICT_FILE}. Checking for test file...")
         TEST_FILE = os.path.join(DATA_DIR, f"{config.LANG}_{config.DOMAIN}_test_{TASK_NAME}.jsonl")
         if os.path.exists(TEST_FILE):
@@ -144,44 +142,25 @@ def main():
     print(f"Train File: {TRAIN_FILE}")
     print(f"Predict File: {PREDICT_FILE}")
 
-    # --- Load Model (Standard HuggingFace) ---
+    # --- Load Model (Unsloth) ---
     print(f"Loading model: {args.model}...")
-    
-    # 1. Load Tokenizer
-    tokenizer = AutoTokenizer.from_pretrained(args.model)
-    tokenizer.pad_token = tokenizer.eos_token
-
-    # 2. Load Model with Quantization (Optional but recommended for VRAM)
-    # Note: BitsAndBytes works on Windows with supported CUDA drivers
-    bnb_config = BitsAndBytesConfig(
+    model, tokenizer = FastLanguageModel.from_pretrained(
+        model_name=args.model,
+        max_seq_length=2048, 
         load_in_4bit=True,
-        bnb_4bit_quant_type="nf4",
-        bnb_4bit_compute_dtype=torch.float16,
-        bnb_4bit_use_double_quant=True,
     )
 
-    model = AutoModelForCausalLM.from_pretrained(
-        args.model,
-        quantization_config=bnb_config,
-        device_map="auto",
-        torch_dtype=torch.float16
-    )
-
-    # Disable cache for training
-    model.config.use_cache = False
-
-    # --- LoRA Config (Standard PEFT) ---
-    lora_config = LoraConfig(
+    # --- LoRA Config (Unsloth) ---
+    model = FastLanguageModel.get_peft_model(
+        model,
         r=16,
         lora_alpha=16,
         lora_dropout=0.05,
         target_modules=["q_proj", "k_proj", "v_proj", "o_proj"],
         bias="none",
-        task_type="CAUSAL_LM",
+        use_gradient_checkpointing=True,
+        random_state=config.SEED,
     )
-
-    model = get_peft_model(model, lora_config)
-    model.print_trainable_parameters()
 
     # --- Load & Split Data ---
     train_raw = load_dataset("json", data_files=TRAIN_FILE, split="train")
@@ -192,10 +171,15 @@ def main():
     eval_dataset = split_dataset["test"].map(format_train_example)
 
     # --- Trainer ---
+    # --- Trainer ---
     os.makedirs(MODEL_SAVE_DIR, exist_ok=True)
 
-    # Reverting to standard TrainingArguments for maximum compatibility
-    training_args = TrainingArguments(
+    # Fix tokenizer pad/eos issues before config
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+
+    # SFTConfig
+    args = SFTConfig(
         per_device_train_batch_size=1,
         gradient_accumulation_steps=4,
         learning_rate=2e-4,
@@ -207,19 +191,25 @@ def main():
         metric_for_best_model="loss",
         greater_is_better=False,
         output_dir=MODEL_SAVE_DIR,
-        fp16=True, # Standard mixed precision
+        fp16=not torch.cuda.is_bf16_supported(),
+        bf16=torch.cuda.is_bf16_supported(),
+        optim="adamw_8bit",
         report_to="none",
+        dataset_text_field="text",
+        packing=True,
     )
+
+    # --- CRITICAL FIX ---
+    # The library version has a bug: it requires eos_token_id but rejects it in __init__.
+    # We manually patch the config object to override the bad default ('<EOS_TOKEN>').
+    args.eos_token_id = tokenizer.eos_token_id
 
     trainer = SFTTrainer(
         model=model,
-        args=training_args,
+        processing_class=tokenizer, 
         train_dataset=train_dataset,
         eval_dataset=eval_dataset, 
-        dataset_text_field="text",
-        # Standard TRL usually requires tokenizer, not processing_class
-        tokenizer=tokenizer,
-        max_seq_length=2048,
+        args=args,
         callbacks=[EarlyStoppingCallback(early_stopping_patience=subtask_cfg.get("PATIENCE", 2))],
     )
 
@@ -229,10 +219,11 @@ def main():
 
     # --- Inference ---
     print("\nRunning inference...")
-    model.eval() # Standard eval mode
+    FastLanguageModel.for_inference(model)
 
     os.makedirs(PREDICTION_DIR, exist_ok=True)
     
+    # Set Output File name
     output_file = os.path.join(PREDICTION_DIR, f"pred_{config.LANG}_{config.DOMAIN}.jsonl")
 
     with open(PREDICT_FILE, "r", encoding="utf-8") as fin, \
@@ -267,10 +258,9 @@ def main():
             }, ensure_ascii=False) + "\n")
 
     print(f"\nFinished. Output written to:\n{output_file}")
-    
-    # Regression step
     from src.subtask_1.train_subtask1 import main as train_reg
     train_reg(output_file)
+
 
 if __name__ == "__main__":
     main()
