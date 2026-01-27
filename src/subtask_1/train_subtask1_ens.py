@@ -1,0 +1,198 @@
+import sys
+import os
+import numpy as np
+import pandas as pd
+import torch
+from torch.utils.data import DataLoader
+from transformers import AutoTokenizer, get_linear_schedule_with_warmup
+from torch.optim import AdamW
+from sklearn.model_selection import train_test_split
+
+project_root = os.path.abspath(os.path.dirname(__file__))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+from src.shared import utils, config
+from src.shared.dataset import VADataset
+from src.shared.model import TransformerVARegressor
+from scripts.vis.generate_results_plot import generate_plot
+
+# Neue Konfiguration für das Ensembling
+ENSEMBLE_SEEDS = [100, 42, 2026]
+
+
+def train_single_seed(seed, input_file):
+    """
+    Exakt die Logik deiner alten main(), aber parametrisiert mit seed.
+    Gibt die Predictions zurück, statt sie direkt zu speichern.
+    """
+    # 1. Seed setzen
+    utils.set_seed(seed)
+    print(f"\n--- Starting run with SEED {seed} ---")
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    tokenizer = AutoTokenizer.from_pretrained(config.MODEL_NAME)
+
+    # Daten laden (Wie im Original)
+    train_raw = utils.load_jsonl(config.TRAIN_FILE)
+    predict_raw = utils.load_jsonl(input_file)
+
+    if not train_raw or not predict_raw:
+        print("Error: Data loading failed.")
+        return None
+
+    train_df = utils.jsonl_to_df(train_raw)
+    predict_df = utils.jsonl_to_df(predict_raw)
+
+    # WICHTIG: Split muss stabil bleiben über Seeds hinweg für vergleichbare Metriken,
+    # daher nutzen wir hier config.SEED statt dem Loop-Seed für den Split.
+    train_df, dev_df = train_test_split(train_df, test_size=0.1, random_state=config.SEED)
+
+    train_dataset = VADataset(train_df, tokenizer, max_len=config.MAX_LEN, num_bins=config.NUM_BINS, sigma=config.SIGMA)
+    train_loader = DataLoader(train_dataset, batch_size=config.BATCH_SIZE, shuffle=True, pin_memory=True, num_workers=0, drop_last=True)
+
+    dev_dataset = VADataset(dev_df, tokenizer, max_len=config.MAX_LEN, num_bins=config.NUM_BINS, sigma=config.SIGMA)
+    dev_loader = DataLoader(dev_dataset, batch_size=config.BATCH_SIZE, shuffle=False, pin_memory=True, num_workers=0)
+
+    predict_dataset = VADataset(predict_df, tokenizer, max_len=config.MAX_LEN, num_bins=config.NUM_BINS,
+                                sigma=config.SIGMA)
+    predict_loader = DataLoader(predict_dataset, batch_size=config.BATCH_SIZE, shuffle=False, pin_memory=True,
+                                num_workers=0)
+
+    model = TransformerVARegressor(model_name=config.MODEL_NAME, num_bins=config.NUM_BINS).to(device)
+    optimizer = AdamW(model.parameters(), lr=config.LEARNING_RATE)
+    loss_fn = utils.LDLLoss()
+
+    num_training_steps = len(train_loader) * config.EPOCHS
+    num_warmup_steps = int(num_training_steps * 0.1)
+
+    scheduler = get_linear_schedule_with_warmup(
+        optimizer,
+        num_warmup_steps=num_warmup_steps,
+        num_training_steps=num_training_steps
+    )
+
+    best_val_loss = float('inf')
+    epochs_no_improve = 0
+
+    # Temporärer Pfad für diesen Seed, damit wir nicht überschreiben
+    temp_save_path = config.MODEL_SAVE_PATH.replace(".pt", f"_seed_{seed}.pt")
+
+    # Training Loop (unverändert)
+    print("\n--- Starting Training ---")
+    for epoch in range(config.EPOCHS):
+        print(f"\nEpoch {epoch + 1}/{config.EPOCHS}")  # <--- Wieder eingefügt
+
+        train_loss = model.train_epoch(train_loader, optimizer, scheduler, device, loss_fn)
+        val_loss = model.eval_epoch(dev_loader, loss_fn, device)
+
+        print(f"Train Loss: {train_loss:.4f} | Val Loss: {val_loss:.4f}")  # <--- Wieder eingefügt
+
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+            torch.save(model.state_dict(), temp_save_path)
+            print(f"New best model saved for seed {seed} (Loss: {val_loss:.4f})")  # Optional: Bestätigung
+            epochs_no_improve = 0
+        else:
+            epochs_no_improve += 1
+
+        if epochs_no_improve == config.PATIENCE:
+            print(f"Early stopping at epoch {epoch + 1}")
+            break
+
+    # Bestes Modell laden
+    print(f"Loading best model from {temp_save_path}...")
+    model.load_state_dict(torch.load(temp_save_path))
+
+    pred_v_dev, pred_a_dev, gold_v_dev, gold_a_dev = utils.get_ldl_predictions(model, dev_loader, device, type="dev")
+    pred_v_test, pred_a_test = utils.get_ldl_predictions(model, predict_loader, device, type="pred")
+
+    single_seed_score = utils.evaluate_predictions_task1(pred_a_dev, pred_v_dev, gold_a_dev, gold_v_dev)
+
+    print(f"\n>>> RESULT FOR SEED {seed}:")
+    print(f"    PCC_V:   {single_seed_score['PCC_V']:.4f}")
+    print(f"    PCC_A:   {single_seed_score['PCC_A']:.4f}")
+    print(f"    RMSE_VA: {single_seed_score['RMSE_VA']:.4f}")
+    print(f"{'-' * 40}\n")
+
+    del model
+    torch.cuda.empty_cache()
+
+    return {
+        "dev_preds": (pred_v_dev, pred_a_dev),
+        "dev_gold": (gold_v_dev, gold_a_dev),
+        "test_preds": (pred_v_test, pred_a_test),
+        "predict_df": predict_df
+    }
+
+
+def main(input: str):
+    print(f"Is CUDA available? {torch.cuda.is_available()}")
+
+    all_dev_v = []
+    all_dev_a = []
+    all_test_v = []
+    all_test_a = []
+
+    gold_v = None
+    gold_a = None
+    final_predict_df = None
+
+    # --- Schleife über Seeds ---
+    for seed in ENSEMBLE_SEEDS:
+        results = train_single_seed(seed, input)
+        if results is None: continue
+
+        # Sammeln
+        all_dev_v.append(results["dev_preds"][0])
+        all_dev_a.append(results["dev_preds"][1])
+        all_test_v.append(results["test_preds"][0])
+        all_test_a.append(results["test_preds"][1])
+
+        # Einmalig statische Daten speichern
+        if gold_v is None:
+            gold_v = results["dev_gold"][0]
+            gold_a = results["dev_gold"][1]
+            final_predict_df = results["predict_df"]
+
+    # --- Averaging ---
+    print("\n--- Averaging Ensemble Predictions ---")
+    avg_dev_v = np.mean(all_dev_v, axis=0)
+    avg_dev_a = np.mean(all_dev_a, axis=0)
+
+    avg_test_v = np.mean(all_test_v, axis=0)
+    avg_test_a = np.mean(all_test_a, axis=0)
+
+    # --- Evaluation & Speichern (Exakt wie in deiner alten main) ---
+    eval_score = utils.evaluate_predictions_task1(avg_dev_a.tolist(), avg_dev_v.tolist(), gold_a, gold_v)
+
+    print(f"\n--- Dev Set Evaluation (Ensemble) ---")
+    print(f"PCC_V: {eval_score['PCC_V']:.4f}")
+    print(f"PCC_A: {eval_score['PCC_A']:.4f}")
+    print(f"RMSE_VA: {eval_score['RMSE_VA']:.4f}")
+
+    final_predict_df["Valence"] = avg_test_v
+    final_predict_df["Arousal"] = avg_test_a
+
+    os.makedirs(os.path.dirname(config.PREDICTION_FILE), exist_ok=True)
+
+    utils.df_to_jsonl(final_predict_df, config.PREDICTION_FILE)
+    print(f"Predictions saved to {config.PREDICTION_FILE}")
+    # CSV Log
+    results_data = {
+        'date': pd.Timestamp.now().strftime('%Y-%m-%d'),
+        'experiment': f"{config.MODEL_VERSION_ID}_ENSEMBLE",
+        'model': config.MODEL_NAME,
+        'pcc_v': eval_score['PCC_V'],
+        'pcc_a': eval_score['PCC_A'],
+        'rmse_va': eval_score['RMSE_VA']
+    }
+    utils.log_results_to_csv(config.CSV_DIR, results_data)
+
+    try:
+        generate_plot()
+    except Exception as e:
+        print(f"Warning: Plot generation failed ({e}), but predictions were saved successfully.")
+
+if __name__ == "__main__":
+    main(input=config.PREDICT_FILE)
