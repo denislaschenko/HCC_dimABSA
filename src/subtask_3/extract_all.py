@@ -21,7 +21,7 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 from src.shared import config, utils
-from src.subtask_2 import extract_aspects
+from src.subtask_2 import SFT_Slop2
 
 def load_training_data(filepath):
     data = []
@@ -129,7 +129,26 @@ class ContrastiveCategoryModel(torch.nn.Module):
 
 def main():
     start_time = time.time()
-    extract_aspects.main()
+    subtask2_pred_file = os.path.join(config.PROJECT_ROOT, "outputs", "subtask_2", "predictions",
+                                      f"pred_{config.LANG}_{config.DOMAIN}.jsonl")
+    # SFT_Slop2.main()
+    print("\n--- Step 1: Running Integrated Triplet Inference ---")
+    import subprocess
+
+    adapter_path = "/workspace/HCC_dimABSA_remote/outputs/subtask_2/models/final_adapter"
+    inference_script = os.path.join(config.PROJECT_ROOT, "src", "subtask_2", "inference.py")
+
+    subprocess.run([
+        sys.executable,
+        inference_script,
+        "--checkpoint", adapter_path
+    ], check=True)
+
+    print("\n--- Step 2: Proceeding to Subtask 3 Category Extraction ---")
+
+    if not os.path.exists(subtask2_pred_file):
+        raise FileNotFoundError(f"Subtask 2 predictions not found at {subtask2_pred_file}. Run inference.py first.")
+
     target_file = PREDICTION_FILE
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -138,7 +157,7 @@ def main():
     print("Loading Training Data (Memory Bank)...")
 
     # # debug train data for speedtest
-    train_data = load_training_data(config.LOCAL_TRAIN_FILE)
+    train_data = load_training_data(config.TRAIN_FILE)
     # train_data = train_data[:15]
 
     all_categories = sorted(list(set(d["Category"] for d in train_data)))
@@ -197,11 +216,11 @@ def main():
     y_train = np.array(bank_labels)
 
     print("Fitting KNN Classifier...")
-    knn = KNeighborsClassifier(n_neighbors=15, metric='cosine', weights='distance')
+    knn = KNeighborsClassifier(n_neighbors=5, metric='cosine', weights='distance')
     knn.fit(X_train, y_train)
 
-    print(f"Loading Prediction Data: {target_file}")
-    pred_data = load_inference_data(target_file)
+    print(f"Loading Prediction Data: {subtask2_pred_file}")
+    pred_data = load_inference_data(subtask2_pred_file)
     pred_dataset = CategoryDataset(pred_data, tokenizer, config.MAX_LEN, is_inference=True)
     pred_loader = DataLoader(pred_dataset, batch_size=config.BATCH_SIZE, shuffle=False)
 
@@ -238,7 +257,9 @@ def main():
 
     final_output = []
 
-    with open(PREDICTION_FILE, "r", encoding="utf-8") as f:
+    os.makedirs(os.path.dirname(target_file), exist_ok=True)
+
+    with open(subtask2_pred_file, "r", encoding="utf-8") as f:
         for line in f:
             item = json.loads(line)
 

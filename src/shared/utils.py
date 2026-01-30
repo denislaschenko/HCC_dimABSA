@@ -81,6 +81,31 @@ class CCCLoss(nn.Module):
         ccc = (2 * covariance) / (var_x + var_y + mean_diff ** 2 + 1e-8)
         return 1.0 - ccc
 
+class SafeLDLLoss(nn.Module):
+    def __init__(self, sigma=1.0, num_bins=9):
+        super().__init__()
+        self.sigma = sigma
+        self.bins = torch.linspace(1.0, float(num_bins), num_bins)
+        self.kl_loss = nn.KLDivLoss(reduction='batchmean')
+
+    def forward(self, logits, target_scalar):
+        device = logits.device
+        self.bins = self.bins.to(device)
+
+        # Ensure we have [Batch, 1] shape for scalar targets
+        target_scalar = target_scalar.float().view(-1, 1)
+        logits = logits.float()
+
+        # Generate Gaussian Distribution on the fly (Mathematically Safer)
+        bin_diff = self.bins.unsqueeze(0) - target_scalar
+        target_dist = torch.exp(-(bin_diff ** 2) / (2 * self.sigma ** 2))
+
+        # Normalize with epsilon to prevent 0.0 division
+        target_dist = target_dist / (target_dist.sum(dim=1, keepdim=True) + 1e-9)
+
+        log_probs = functional.log_softmax(logits, dim=1)
+        return self.kl_loss(log_probs, target_dist)
+
 def load_jsonl(filepath: str) -> List[Dict]:
     try:
         with open(filepath, "r", encoding="utf-8") as f:
@@ -247,6 +272,18 @@ def df_to_jsonl(df: pd.DataFrame, out_path: str):
                     })
             f.write(json.dumps(record, ensure_ascii=False) + "\n")
 
+def recalibrate_predictions(preds, gold):
+
+    preds = np.array(preds)
+    gold = np.array(gold)
+
+    mu_pred, std_pred = np.mean(preds), np.std(preds)
+    mu_gold, std_gold = np.mean(gold), np.std(gold)
+
+    recalibrated = (preds - mu_pred) * (std_gold / std_pred) + mu_gold
+
+    return recalibrated
+
 
 def set_seed(seed: int):
     random.seed(seed)
@@ -255,8 +292,8 @@ def set_seed(seed: int):
     if torch.cuda.is_available():
         torch.cuda.manual_seed(seed)
         torch.cuda.manual_seed_all(seed)
-        torch.backends.cudnn.deterministic = True
-        torch.backends.cudnn.benchmark = False
+        # torch.backends.cudnn.deterministic = True
+        # torch.backends.cudnn.benchmark = False
 
 def log_results_to_csv(csv_path: str, results: dict):
     try:

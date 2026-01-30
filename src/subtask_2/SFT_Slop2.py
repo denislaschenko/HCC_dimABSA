@@ -14,9 +14,10 @@ import argparse
 import torch
 from datasets import load_dataset
 from trl import SFTTrainer, SFTConfig  # <--- Add SFTConfig here
-from transformers import EarlyStoppingCallback
-from unsloth import FastLanguageModel
+from transformers import EarlyStoppingCallback, AutoModelForCausalLM, BitsAndBytesConfig, AutoTokenizer
 from tqdm import tqdm
+from peft import LoraConfig, get_peft_model, TaskType
+from sentence_transformers import SentenceTransformer, util
 
 # Import shared configuration
 from src.shared import config
@@ -25,65 +26,50 @@ from src.shared import config
 # 1. Prompt Configuration (Task 2 - Tuple Approach)
 # ==========================================
 
-INSTRUCTION = """Below is an instruction describing a task, paired with an input that provides additional context. Your goal is to generate an output that correctly completes the task.
-
-### Instruction:
-Given a textual instance [Text], extract all (A, O, VA) triplets, where:
+INSTRUCTION = """Given a textual instance [Text], extract all (A, O, VA) triplets, where:
 - A is an Aspect term (a phrase describing an entity mentioned in [Text])
 - O is an Opinion term
 - VA is a Valence–Arousal score in the format (valence#arousal)
 
-Valence ranges from 1 (negative) to 9 (positive),
-Arousal ranges from 1 (calm) to 9 (excited).
+RULES:
+1. EXTRACT EXACTLY: Copy the substring exactly as it appears in the text, including typos and capitalization.
+2. NO NULLS: Every triplet must have explicit Aspects and Opinions from the text. Do not generate 'NULL'.
+3. NO HALLUCINATIONS: If a word is not in the text, do not extract it.
+4. VA FORMAT: Use '0#0' as a placeholder for the VA score; it will be calculated by a secondary model.
 
-### Example:
-Input:
-[Text] average to good thai food, but terrible delivery.
+Be exhaustive: extract every aspect and opinion mentioned. You must preserve the EXACT capitalization and spelling as it appears in the [Text]."""
 
-Output:
-[Triplet] (thai food, average to good, 6.75#6.38), (delivery, terrible, 2.88#6.62)
 
-### Question:
-Now complete the following example:
-Input:
-"""
+class ExampleRetriever:
+    def __init__(self, train_path, model_name='BAAI/bge-base-en-v1.5'):
+        self.encoder = SentenceTransformer(model_name)
+        self.examples = []
 
-def format_train_example(example):
-    """
-    Converts training jsonl → SFT text (Tuple Format)
-    """
-    text = example["Text"]
-    quads = example.get("Quadruplet", [])
-    
-    # Build Answer String (A, O, VA)
-    answer_parts = []
-    for q in quads:
-        if q.get("Aspect") != "NULL" and q.get("Opinion") != "NULL":
-            answer_parts.append(f"({q['Aspect']}, {q['Opinion']}, {q['VA']})")
-            
-    answer_str = ", ".join(answer_parts)
-    
-    # Construct Prompt
-    prompt = f"{INSTRUCTION}\n[Text] {text}\n\nOutput:\n"
-    return {"text": f"{prompt}\n{answer_str}"}
+        # Load examples from the training file
+        with open(train_path, 'r', encoding='UTF-8') as f:
+            raw_data = [json.loads(line) for line in f if line.strip()]
 
-def build_infer_prompt(text):
-    return f"{INSTRUCTION}\n[Text] {text}\n\nOutput:\n"
+        for item in raw_data:
+            quads = item.get("Quadruplet", [])
+            # Filter for valid triplets only
+            valid_triplets = [f"({q['Aspect']}, {q['Opinion']}, {q['VA']})"
+                              for q in quads if q.get("Aspect") != "NULL"]
 
-def extract_triplets_regex(decoded_text):
-    """Robust Regex extraction of (A, O, VA) tuples."""
-    result = []
-    # Pattern: (Aspect, Opinion, VA#VA)
-    pattern = r'\(([^,]+),\s*([^,]+),\s*([\d.]+#[\d.]+)\)'
-    matches = re.findall(pattern, decoded_text)
-    
-    for aspect, opinion, va in matches:
-        result.append({
-            "Aspect": aspect.strip(),
-            "Opinion": opinion.strip(),
-            "VA": va.strip()
-        })
-    return result
+            if valid_triplets:
+                self.examples.append({
+                    "Text": item["Text"],
+                    "Answer": ", ".join(valid_triplets)
+                })
+
+        # Pre-compute embeddings for fast retrieval
+        texts = [ex["Text"] for ex in self.examples]
+        self.embeddings = self.encoder.encode(texts, convert_to_tensor=True, normalize_embeddings=True)
+
+    def retrieve(self, query_text, k=3):
+        query_emb = self.encoder.encode(query_text, convert_to_tensor=True, normalize_embeddings=True)
+        scores = util.cos_sim(query_emb, self.embeddings)[0]
+        top_results = torch.topk(scores, k=min(k, len(self.examples)))
+        return [self.examples[idx] for idx in top_results.indices]
 
 # ==========================================
 # 2. Main Execution
@@ -92,175 +78,137 @@ def extract_triplets_regex(decoded_text):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", default="unsloth/Qwen2.5-7B-Instruct-bnb-4bit")
-    args = parser.parse_args()
+    args_cli = parser.parse_args()
 
-    # --- Config Handling ---
-    # We explicitly target 'subtask_2' for Task 2 (A, O, VA)
-    # This ensures paths are correct even if global ACTIVE_SUBTASK is 'subtask_1'
-    SUBTASK_NAME = "subtask_2"
-    TASK_NAME = "task2"
-    
-    if SUBTASK_NAME not in config.TASK_CONFIGS:
-        raise ValueError(f"{SUBTASK_NAME} not found in config TASK_CONFIGS")
+    # Paths and Config
+    subtask_cfg = config.TASK_CONFIGS["subtask_2"]
+    DATA_DIR = os.path.join(config.PROJECT_ROOT, "task-dataset", "track_a", "subtask_2", config.LANG)
+    MODEL_SAVE_DIR = os.path.join(config.PROJECT_ROOT, "outputs", "subtask_2", "models")
+    PREDICTION_DIR = os.path.join(config.PROJECT_ROOT, "outputs", "subtask_2", "predictions")
+    TRAIN_FILE = os.path.join(DATA_DIR, f"{config.LANG}_{config.DOMAIN}_production_train.jsonl")
+    PREDICT_FILE = os.path.join(DATA_DIR, f"{config.LANG}_{config.DOMAIN}_dev_task2.jsonl")
 
-    subtask_cfg = config.TASK_CONFIGS[SUBTASK_NAME]
-    
-    print(f"Running for: {SUBTASK_NAME} (Domain: {config.DOMAIN}, Lang: {config.LANG})")
-
-    # --- Path Construction (Based on config.py logic) ---
-    # 1. Data Directory: task-dataset/track_a/subtask_2/eng
-    DATA_DIR = os.path.join(
-        config.PROJECT_ROOT, 
-        "task-dataset", 
-        "track_a", 
-        SUBTASK_NAME, 
-        config.LANG
-    )
-    
-    # 2. Output Directories
-    MODEL_SAVE_DIR = os.path.join(config.PROJECT_ROOT, "outputs", SUBTASK_NAME, "models")
-    PREDICTION_DIR = os.path.join(config.PROJECT_ROOT, "outputs", SUBTASK_NAME, "predictions")
-    
-    # 3. File Paths
-    TRAIN_FILE = os.path.join(DATA_DIR, f"{config.LANG}_{config.DOMAIN}_train_alltasks.jsonl")
-    PREDICT_FILE = os.path.join(DATA_DIR, f"{config.LANG}_{config.DOMAIN}_dev_{TASK_NAME}.jsonl")
-    
-    # Verify files exist
-    if not os.path.exists(TRAIN_FILE):
-        raise FileNotFoundError(f"Training file not found: {TRAIN_FILE}")
-    if not os.path.exists(PREDICT_FILE):
-        # Fallback for test file if dev file missing
-        print(f"Dev file not found at {PREDICT_FILE}. Checking for test file...")
-        TEST_FILE = os.path.join(DATA_DIR, f"{config.LANG}_{config.DOMAIN}_test_{TASK_NAME}.jsonl")
-        if os.path.exists(TEST_FILE):
-            PREDICT_FILE = TEST_FILE
-            print(f"Using test file: {PREDICT_FILE}")
-        else:
-            raise FileNotFoundError(f"Neither dev nor test file found in {DATA_DIR}")
-
-    print(f"Data Dir: {DATA_DIR}")
-    print(f"Train File: {TRAIN_FILE}")
-    print(f"Predict File: {PREDICT_FILE}")
-
-    # --- Load Model (Unsloth) ---
-    print(f"Loading model: {args.model}...")
-    model, tokenizer = FastLanguageModel.from_pretrained(
-        model_name=args.model,
-        max_seq_length=2048, 
+    # --- Load Model & Tokenizer ---
+    bnb_config = BitsAndBytesConfig(
         load_in_4bit=True,
+        bnb_4bit_quant_type="nf4",
+        bnb_4bit_compute_dtype=torch.bfloat16
     )
+    model = AutoModelForCausalLM.from_pretrained(args_cli.model, quantization_config=bnb_config, device_map="auto")
+    tokenizer = AutoTokenizer.from_pretrained(args_cli.model)
+    tokenizer.pad_token = tokenizer.eos_token
+    tokenizer.padding_side = "right"
 
-    # --- LoRA Config (Unsloth) ---
-    model = FastLanguageModel.get_peft_model(
-        model,
-        r=16,
-        lora_alpha=16,
+    # --- LoRA Config ---
+    peft_config = LoraConfig(
+        r=32,
+        lora_alpha=64,
         lora_dropout=0.05,
-        target_modules=["q_proj", "k_proj", "v_proj", "o_proj"],
-        bias="none",
-        use_gradient_checkpointing=True,
-        random_state=config.SEED,
+        target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
+        task_type="CAUSAL_LM"
     )
+    model = get_peft_model(model, peft_config)
 
-    # --- Load & Split Data ---
-    train_raw = load_dataset("json", data_files=TRAIN_FILE, split="train")
+    # --- Training Setup ---
+    def format_train(ex):
+        # Change the VA scores to 0#0 placeholder in the training targets
+        ans = ", ".join([f"({q['Aspect']}, {q['Opinion']}, 0#0)" for q in ex.get("Quadruplet", []) if
+                         q.get("Aspect") != "NULL"])
+        msg = [
+            {"role": "system", "content": INSTRUCTION},
+            {"role": "user", "content": f"[Text] {ex['Text']}\n\nOutput:\n"},
+            {"role": "assistant", "content": ans}
+        ]
+        return {"text": tokenizer.apply_chat_template(msg, tokenize=False)}
 
-    # Create a validation split (10%)
-    split_dataset = train_raw.train_test_split(test_size=0.1)
-    train_dataset = split_dataset["train"].map(format_train_example)
-    eval_dataset = split_dataset["test"].map(format_train_example)
+    train_ds = load_dataset("json", data_files=TRAIN_FILE, split="train").train_test_split(test_size=0.1)
+    train_set = train_ds["train"].map(format_train)
+    eval_set = train_ds["test"].map(format_train)
 
-    # --- Trainer ---
-    # --- Trainer ---
-    os.makedirs(MODEL_SAVE_DIR, exist_ok=True)
-
-    # Fix tokenizer pad/eos issues before config
-    if tokenizer.pad_token is None:
-        tokenizer.pad_token = tokenizer.eos_token
-
-    # SFTConfig
-    args = SFTConfig(
-        per_device_train_batch_size=1,
-        gradient_accumulation_steps=4,
-        learning_rate=2e-4,
-        num_train_epochs=config.EPOCHS if config.EPOCHS < 5 else 3,
-        logging_steps=10,
-        save_strategy="epoch",
-        eval_strategy="epoch",
-        load_best_model_at_end=True,
-        metric_for_best_model="loss",
-        greater_is_better=False,
+    sft_args = SFTConfig(
+        per_device_train_batch_size=4,
+        gradient_accumulation_steps=2,
+        learning_rate=1.5e-4,
+        lr_scheduler_type="cosine",
+        warmup_ratio=0.03,
+        weight_decay=0.01,
+        num_train_epochs=3,
         output_dir=MODEL_SAVE_DIR,
-        fp16=not torch.cuda.is_bf16_supported(),
-        bf16=torch.cuda.is_bf16_supported(),
-        optim="adamw_8bit",
-        report_to="none",
+        bf16=True,
         dataset_text_field="text",
-        packing=True,
+        packing=False,
+        eval_strategy="steps",
+        eval_steps=100,
+        save_strategy="steps",
+        save_steps=100,
+        load_best_model_at_end=True,
+        save_total_limit=2,
     )
-
-    # --- CRITICAL FIX ---
-    # The library version has a bug: it requires eos_token_id but rejects it in __init__.
-    # We manually patch the config object to override the bad default ('<EOS_TOKEN>').
-    args.eos_token_id = tokenizer.eos_token_id
 
     trainer = SFTTrainer(
         model=model,
-        processing_class=tokenizer, 
-        train_dataset=train_dataset,
-        eval_dataset=eval_dataset, 
-        args=args,
-        callbacks=[EarlyStoppingCallback(early_stopping_patience=subtask_cfg.get("PATIENCE", 2))],
+        train_dataset=train_set,
+        eval_dataset=eval_set,
+        args=sft_args,
+        callbacks=[EarlyStoppingCallback(early_stopping_patience=10)]
     )
 
-    # --- Start Training ---
     print("\nTraining AO SFT model...")
     trainer.train()
 
-    # --- Inference ---
-    print("\nRunning inference...")
-    FastLanguageModel.for_inference(model)
+    final_adapter_path = os.path.join(MODEL_SAVE_DIR, "final_adapter")
+    trainer.model.save_pretrained(final_adapter_path)
+    print(f"Model saved to {final_adapter_path}")
 
-    os.makedirs(PREDICTION_DIR, exist_ok=True)
-    
-    # Set Output File name
-    output_file = os.path.join(PREDICTION_DIR, f"pred_{config.LANG}_{config.DOMAIN}.jsonl")
+    print("\n--- Starting Integrated Inference ---")
+    import subprocess
 
-    with open(PREDICT_FILE, "r", encoding="utf-8") as fin, \
-         open(output_file, "w", encoding="utf-8") as fout:
+    inference_script = os.path.join(config.PROJECT_ROOT, "src", "subtask_2", "inference.py")
 
-        for line in tqdm(fin, desc="Predicting"):
-            item = json.loads(line)
-            prompt = build_infer_prompt(item["Text"])
+    subprocess.run([
+        sys.executable,
+        inference_script,
+        "--checkpoint", final_adapter_path
+    ])
 
-            inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=2048).to(model.device)
-
-            with torch.no_grad():
-                outputs = model.generate(
-                    **inputs,
-                    max_new_tokens=256,
-                    do_sample=False, 
-                    pad_token_id=tokenizer.eos_token_id
-                )
-
-            decoded = tokenizer.decode(
-                outputs[0][inputs.input_ids.shape[1]:],
-                skip_special_tokens=True
-            )
-
-            # Use Regex extraction
-            triplets = extract_triplets_regex(decoded)
-
-            fout.write(json.dumps({
-                "ID": item["ID"],
-                "Text": item["Text"],
-                "Triplet": triplets
-            }, ensure_ascii=False) + "\n")
-
-    print(f"\nFinished. Output written to:\n{output_file}")
-    from src.subtask_1.train_subtask1 import main as train_reg
-    train_reg(output_file)
-
+    # # --- RAG Inference ---
+    # print("\nInitializing Retriever for Inference...")
+    # retriever = ExampleRetriever(TRAIN_FILE)
+    # output_file = os.path.join(PREDICTION_DIR, f"pred_{config.LANG}_{config.DOMAIN}.jsonl")
+    # os.makedirs(PREDICTION_DIR, exist_ok=True)
+    #
+    # def build_infer_prompt(text, retrieved_examples):
+    #     messages = [{"role": "system", "content": INSTRUCTION}]
+    #     for ex in retrieved_examples:
+    #         messages.append({"role": "user", "content": f"Extract triplets: {ex['Text']}"})
+    #         messages.append({"role": "assistant", "content": ex["Answer"]})
+    #     messages.append({"role": "user", "content": f"[Text] {text}\n\nOutput:\n"})
+    #     return tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+    #
+    # def extract_triplets_regex(decoded_text):
+    #     pattern = r'\((.*?), (.*?), (\d+(?:\.\d+)?\s*#\s*\d+(?:\.\d+)?)\)'
+    #     matches = re.findall(pattern, decoded_text)
+    #     return [{"Aspect": a.strip(), "Opinion": o.strip(), "VA": v.replace(" ", "")} for a, o, v in matches]
+    #
+    # model.eval()
+    # with open(PREDICT_FILE, "r", encoding="utf-8") as fin, open(output_file, "w", encoding="utf-8") as fout:
+    #     for line in tqdm(fin, desc="Predicting"):
+    #         item = json.loads(line)
+    #         dynamic_examples = retriever.retrieve(item["Text"], k=3)
+    #         prompt = build_infer_prompt(item["Text"], dynamic_examples)
+    #         inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=4096).to(model.device)
+    #
+    #         with torch.no_grad():
+    #             outputs = model.generate(**inputs, max_new_tokens=256, do_sample=False,
+    #                                      pad_token_id=tokenizer.eos_token_id)
+    #
+    #         # Extract only the newly generated part
+    #         decoded = tokenizer.decode(outputs[0][inputs.input_ids.shape[1]:], skip_special_tokens=True)
+    #         fout.write(json.dumps({
+    #             "ID": item["ID"],
+    #             "Text": item["Text"],
+    #             "Triplet": extract_triplets_regex(decoded)
+    #         }, ensure_ascii=False) + "\n")
 
 if __name__ == "__main__":
     main()

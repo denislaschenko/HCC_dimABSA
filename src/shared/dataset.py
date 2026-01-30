@@ -43,13 +43,14 @@ class VADataset(Dataset):
             opinions = None
 
         full_texts = []
+
         sep = self.tokenizer.sep_token
 
         for i in range(len(sentences)):
             if opinions:
-                text = f"{aspects[i]} {sep} {opinions[i]} {sep} {sentences[i]}"
+                text = f"{aspects[i]} {sep}{sep} {opinions[i]} {sep}{sep} {sentences[i]}"
             else:
-                text = f"{aspects[i]} {sep} {sentences[i]}"
+                text = f"{aspects[i]} {sep}{sep} {sentences[i]}"
             full_texts.append(text)
 
         print(f"Tokenizing {len(full_texts)} samples...")

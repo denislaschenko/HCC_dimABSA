@@ -10,7 +10,7 @@ from sentence_transformers import SentenceTransformer, util
 from src.subtask_1.train_subtask1 import main as train_reg
 from src.shared import config
 
-TRAIN_DATA_PATH = config.LOCAL_TRAIN_FILE
+TRAIN_DATA_PATH = config.TRAIN_FILE
 NUM_SHOTS = 5
 
 
@@ -24,12 +24,12 @@ Given a textual instance [Text], extract all (A, O) tuples, where:
 - You must always format the output as a valid JSON object.
 """
 
-input_file = config.LOCAL_PREDICT_FILE
+input_file = config.PREDICT_FILE
 output_file = config.PREDICTION_FILE
 
 
 class ExampleRetriever:
-    def __init__(self, train_path, model_name='all-MiniLM-L6-v2'):
+    def __init__(self, train_path, model_name='BAAI/bge-base-en-v1.5'):
         print(f"\n[DEBUG] Initializing Retriever...")
         print(f"[DEBUG] Target Train File: {train_path}")
         print(f"Loading retrieval model: {model_name}...")
@@ -79,12 +79,15 @@ class ExampleRetriever:
 
         texts = [ex["Text"] for ex in self.examples]
         print(f"Embedding {len(texts)} examples...")
-        self.embeddings = self.encoder.encode(texts, convert_to_tensor=True)
+        self.embeddings = self.encoder.encode(texts, convert_to_tensor=True, normalize_embeddings=True)
 
     def retrieve(self, query_text, k=3):
         if self.embeddings is None:
             return []
-        query_emb = self.encoder.encode(query_text, convert_to_tensor=True)
+
+        instruction = "Represent this sentence for searching relevant passages: "
+
+        query_emb = self.encoder.encode(instruction + query_text, convert_to_tensor=True, normalize_embeddings=True)
         scores = util.cos_sim(query_emb, self.embeddings)[0]
         top_results = torch.topk(scores, k=min(k, len(self.examples)))
         return [self.examples[idx] for idx in top_results.indices]
@@ -145,7 +148,7 @@ def extract_pairs_from_llm_output(output_text: str):
 
 
 def process_jsonl(model_name, input_path, output_path, train_path):
-    retriever = ExampleRetriever(train_path, model_name='all-MiniLM-L6-v2')
+    retriever = ExampleRetriever(train_path, model_name='BAAI/bge-base-en-v1.5')
 
     print(f"Loading Generation Model: {model_name}")
     tokenizer = AutoTokenizer.from_pretrained(model_name)
