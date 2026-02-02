@@ -3,7 +3,6 @@
 # =========================
 
 import sys
-import os
 
 from torch.utils.data import DataLoader
 
@@ -22,7 +21,7 @@ from tqdm import tqdm
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from sentence_transformers import SentenceTransformer, util
 
-from src.subtask_1.train_subtask1 import main as train_reg
+from legacy.train_subtask1 import main as train_reg
 from src.shared import config
 
 

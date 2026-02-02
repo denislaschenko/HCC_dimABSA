@@ -548,7 +548,7 @@ def main():
     # eval
     p_eval = subparsers.add_parser("eval", help="Evaluate predictions vs gold")
     p_eval.add_argument("--gold", type=str, required=True, help="Gold JSONL path")
-    p_eval.add_argument("--pred", type=str, required=True, help="Predictions JSONL path")
+    p_eval.add_argument("--download", type=str, required=True, help="Predictions JSONL path")
     p_eval.add_argument("--task", type=str, default="task2", choices=["task2","task3"])
     p_eval.add_argument("--output", type=str, default=None, help="Optional per-instance metrics JSONL output")
 

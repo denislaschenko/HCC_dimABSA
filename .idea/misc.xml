@@ -3,5 +3,5 @@
   <component name="Black">
     <option name="sdkName" value="Python 3.11 (HCC_dimABSA)" />
   </component>
-  <component name="ProjectRootManager" version="2" project-jdk-name="Remote Python 3.11.10 (sftp://root@213.173.108.5:19421/workspace/HCC_dimABSA_remote/.venv/bin/python)" project-jdk-type="Python SDK" />
+  <component name="ProjectRootManager" version="2" project-jdk-name="remote_sftp" project-jdk-type="Python SDK" />
 </project>

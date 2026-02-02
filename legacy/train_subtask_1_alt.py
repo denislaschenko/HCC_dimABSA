@@ -142,7 +142,7 @@ def main():
     # 5. Prediction
     print("Loading best model and predicting...")
     model.load_state_dict(torch.load(config.MODEL_SAVE_PATH))
-    pred_v, pred_a = utils.get_ldl_predictions(model, predict_loader, device, type="pred")
+    pred_v, pred_a = utils.get_ldl_predictions(model, predict_loader, device, type="download")
 
     # Add predictions to the flat dataframe
     predict_df["Valence"] = pred_v

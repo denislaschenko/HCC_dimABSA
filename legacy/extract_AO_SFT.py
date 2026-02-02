@@ -228,7 +228,7 @@ def main():
     print(f"\nFinished. Output written to:\n{output_file}")
     
     
-    from src.subtask_1.train_subtask1 import main as train_reg
+    from legacy.train_subtask1 import main as train_reg
     train_reg(output_file)
 
 if __name__ == "__main__":

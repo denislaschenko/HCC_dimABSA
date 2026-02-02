@@ -2,12 +2,11 @@ import json
 import argparse
 import re
 import torch
-import numpy as np
 import util
 from tqdm import tqdm
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-from src.subtask_1.train_subtask1 import main as train_reg
+from legacy.train_subtask1 import main as train_reg
 from src.shared import config
 
 

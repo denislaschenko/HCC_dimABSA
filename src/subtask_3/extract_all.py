@@ -14,7 +14,7 @@ from tqdm import tqdm
 from transformers import AutoModel, AutoTokenizer
 from unicodedata import category
 
-from src.shared.config import PREDICTION_FILE
+from src.shared.config import OUTPUT_FILE
 
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
 if project_root not in sys.path:
@@ -149,7 +149,7 @@ def main():
     if not os.path.exists(subtask2_pred_file):
         raise FileNotFoundError(f"Subtask 2 predictions not found at {subtask2_pred_file}. Run inference.py first.")
 
-    target_file = PREDICTION_FILE
+    target_file = OUTPUT_FILE
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")

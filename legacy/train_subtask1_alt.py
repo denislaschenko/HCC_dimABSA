@@ -194,7 +194,7 @@ def main():
     # Prediction
     # -----------------------------------------------------------------
     logger.info("Running predictions on the test set...")
-    pred_v, pred_a = utils.get_predictions(model, predict_loader, device, type="pred")
+    pred_v, pred_a = utils.get_predictions(model, predict_loader, device, type="download")
     predict_df["Valence"], predict_df["Arousal"] = pred_v, pred_a
 
     pred_output_file = os.path.join(args.output_dir, "predictions.jsonl")

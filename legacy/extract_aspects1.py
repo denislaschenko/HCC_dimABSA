@@ -2,12 +2,10 @@ import json
 import argparse
 import re
 import torch
-import numpy as np
-from requests import delete
 from tqdm import tqdm
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from sentence_transformers import SentenceTransformer, util
-from src.subtask_1.train_subtask1 import main as train_reg
+from legacy.train_subtask1 import main as train_reg
 from src.shared import config
 
 TRAIN_DATA_PATH = config.TRAIN_FILE

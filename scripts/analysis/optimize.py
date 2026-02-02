@@ -8,7 +8,7 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 try:
-    from src.subtask_1.train_subtask1 import main as run_training_trial
+    from legacy.train_subtask1 import main as run_training_trial
     from src.shared import utils, config
     from scripts.vis import generate_plot
 except ImportError as e:

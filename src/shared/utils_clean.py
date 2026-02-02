@@ -6,14 +6,16 @@ import math
 import pandas as pd
 import numpy as np
 import torch
-from typing import List, Dict
-from scipy.stats import pearsonr
 from torch import nn
 from torch.nn import functional
+from scipy.stats import pearsonr
+from typing import List, Dict, Tuple
 
-from src.shared import config
+
 
 class SupConLoss(nn.Module):
+    """Supervised Contrastive Learning Loss."""
+
     def __init__(self, temperature=0.07):
         super(SupConLoss, self).__init__()
         self.temperature = temperature
@@ -57,16 +59,10 @@ class SupConLoss(nn.Module):
 
         return loss
 
-class LDLLoss(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.kldiv = nn.KLDivLoss(reduction='batchmean')
-
-    def forward(self, logits, targets):
-        log_probs = functional.log_softmax(logits, dim=1)
-        return self.kldiv(log_probs, targets)
 
 class CCCLoss(nn.Module):
+    """Concordance Correlation Coefficient Loss."""
+
     def __init__(self):
         super().__init__()
 
@@ -81,16 +77,23 @@ class CCCLoss(nn.Module):
         ccc = (2 * covariance) / (var_x + var_y + mean_diff ** 2 + 1e-8)
         return 1.0 - ccc
 
-class SafeLDLLoss(nn.Module):
-    def __init__(self, sigma=1.0, num_bins=9):
+
+class LDLLoss(nn.Module):
+    """
+    Label Distribution Learning Loss (KL Divergence).
+    Dynamically generates the target distribution based on the scalar target.
+    """
+    def __init__(self, sigma=1.0, num_bins=9, min_val=1.0, max_val=9.0):
         super().__init__()
         self.sigma = sigma
-        self.bins = torch.linspace(1.0, float(num_bins), num_bins)
+        self.bins = torch.linspace(min_val, max_val, num_bins)
         self.kl_loss = nn.KLDivLoss(reduction='batchmean')
 
     def forward(self, logits, target_scalar):
         device = logits.device
-        self.bins = self.bins.to(device)
+
+        if self.bins.device != device:
+            self.bins = self.bins.to(device)
 
         target_scalar = target_scalar.float().view(-1, 1)
         logits = logits.float()
@@ -125,7 +128,7 @@ def jsonl_to_df(data: List[Dict]) -> pd.DataFrame:
         df = pd.json_normalize(data, 'Triplet', ['ID', 'Text'])
     elif 'Aspect' in data[0]:
         df = pd.DataFrame(data)
-        if df['Aspect'].apply(lambda x: isinstance(x, list)).any():
+        if 'Aspect' in df.columns and df['Aspect'].apply(lambda x: isinstance(x, list)).any():
             df = df.explode('Aspect')
     else:
         df = pd.DataFrame(data)
@@ -145,58 +148,45 @@ def jsonl_to_df(data: List[Dict]) -> pd.DataFrame:
     return df
 
 
-def get_predictions(model, dataloader, device, type="dev") -> tuple:
-    model.eval()
-    all_preds = []
-    all_labels = []
+def df_to_jsonl(df: pd.DataFrame, out_path: str):
+    """Writes a DataFrame back to the competition JSONL format."""
+    df_sorted = df.sort_values(by="ID", key=lambda x: x.map(extract_num))
+    grouped = df_sorted.groupby("ID", sort=False)
 
-    with torch.no_grad():
-        for batch in dataloader:
-            input_ids = batch["input_ids"].to(device)
-            attention_mask = batch["attention_mask"].to(device)
-            outputs = model(input_ids, attention_mask).cpu().numpy()
-            all_preds.append(outputs)
+    has_opinion = "Opinion" in df.columns
 
-            if type == "dev":
-                labels = batch["labels"].cpu().numpy()
-                all_labels.append(labels)
+    with open(out_path, "w", encoding="utf-8") as f:
+        for gid, gdf in grouped:
+            if has_opinion:
+                record = {
+                    "ID": gid,
+                    "Triplet": []
+                }
+                for _, row in gdf.iterrows():
+                    record["Triplet"].append({
+                        "Aspect": row["Aspect"],
+                        "Opinion": row["Opinion"],
+                        "VA": f"{row['Valence']:.2f}#{row['Arousal']:.2f}"
+                    })
+            else:
+                record = {
+                    "ID": gid,
+                    "Aspect_VA": []
+                }
+                for _, row in gdf.iterrows():
+                    record["Aspect_VA"].append({
+                        "Aspect": row["Aspect"],
+                        "VA": f"{row['Valence']:.2f}#{row['Arousal']:.2f}"
+                    })
+            f.write(json.dumps(record, ensure_ascii=False) + "\n")
 
-    preds = np.vstack(all_preds)
-    pred_v = preds[:, 0]
-    pred_a = preds[:, 1]
-
-    if type == "dev":
-        labels = np.vstack(all_labels)
-        gold_v = labels[:, 0]
-        gold_a = labels[:, 1]
-        return pred_v, pred_a, gold_v, gold_a
-    else:
-        return pred_v, pred_a
 
 
-def evaluate_predictions_task1(pred_a, pred_v, gold_a, gold_v) -> dict:
-    if not (all(1 <= x <= 9 for x in pred_v) and all(1 <= x <= 9 for x in pred_a)):
-        print(f"Warning: Some predicted values are out of the 1-9 numerical range.")
-
-    pcc_v = pearsonr(pred_v, gold_v)[0]
-    pcc_a = pearsonr(pred_a, gold_a)[0]
-
-    gold_va = gold_v + gold_a
-    pred_va = pred_v + pred_a
-
-    def rmse(gold, pred):
-        result = [(a - b) ** 2 for a, b in zip(gold, pred)]
-        return math.sqrt(sum(result) / len(gold))
-
-    rmse_va = rmse(gold_va, pred_va)
-
-    return {
-        'PCC_V': pcc_v,
-        'PCC_A': pcc_a,
-        'RMSE_VA': rmse_va,
-    }
-
-def get_ldl_predictions(model, dataloader, device, type="dev", num_bins=config.NUM_BINS):
+def get_ldl_predictions(model, dataloader, device, type="dev", num_bins=9):
+    """
+    Runs inference using Label Distribution Learning (LDL).
+    Returns raw scalar predictions by calculating the expected value of the distribution.
+    """
     model.eval()
     pred_v = []
     pred_a = []
@@ -221,65 +211,53 @@ def get_ldl_predictions(model, dataloader, device, type="dev", num_bins=config.N
             pred_v.extend(v_scores.cpu().tolist())
             pred_a.extend(a_scores.cpu().tolist())
 
-            if type == "dev":
-                if "orig_scores" in batch:
-                    orig = batch["orig_scores"]  # shape [batch, 2]
-                    gold_v.extend(orig[:, 0].tolist())
-                    gold_a.extend(orig[:, 1].tolist())
-                else:
-                    pass
+            if type == "dev" and "orig_scores" in batch:
+                orig = batch["orig_scores"]  # shape [batch, 2]
+                gold_v.extend(orig[:, 0].tolist())
+                gold_a.extend(orig[:, 1].tolist())
+
     if type == "dev":
         return pred_v, pred_a, gold_v, gold_a
     else:
         return pred_v, pred_a
 
-def extract_num(s: str) -> int:
-    m = re.search(r"(\d+)$", str(s))
-    return int(m.group(1)) if m else -1
 
+def evaluate_predictions_task1(pred_a, pred_v, gold_a, gold_v) -> dict:
+    pcc_v = pearsonr(pred_v, gold_v)[0]
+    pcc_a = pearsonr(pred_a, gold_a)[0]
 
-def df_to_jsonl(df: pd.DataFrame, out_path: str):
-    df_sorted = df.sort_values(by="ID", key=lambda x: x.map(extract_num))
-    grouped = df_sorted.groupby("ID", sort=False)
+    gold_va = np.array(gold_v) + np.array(gold_a)
+    pred_va = np.array(pred_v) + np.array(pred_a)
 
-    has_opinion = "Opinion" in df.columns
+    rmse_va = np.sqrt(np.mean((gold_va - pred_va) ** 2))
 
-    with open(out_path, "w", encoding="utf-8") as f:
-        for gid, gdf in grouped:
-            if has_opinion:
-                record = {
-                    "ID": gid,
-                    "Triplet": []
-                }
-                for _, row in gdf.iterrows():
-                    record["Triplet"].append({
-                        "Aspect": row["Aspect"],
-                        "Opinion": row["Opinion"],
-                        "VA": f"{row['Valence']:.2f}#{row['Arousal']:.2f}"
-                    })
-            else :
-                record = {
-                   "ID": gid,
-                  "Aspect_VA": []
-                }
-                for _, row in gdf.iterrows():
-                  record["Aspect_VA"].append({
-                     "Aspect": row["Aspect"],
-                     "VA": f"{row['Valence']:.2f}#{row['Arousal']:.2f}"
-                    })
-            f.write(json.dumps(record, ensure_ascii=False) + "\n")
+    return {
+        'PCC_V': pcc_v,
+        'PCC_A': pcc_a,
+        'RMSE_VA': rmse_va,
+    }
+
 
 def recalibrate_predictions(preds, gold):
-
+    """Matches the mean and std of predictions to the gold set (domain adaptation trick)."""
     preds = np.array(preds)
     gold = np.array(gold)
 
     mu_pred, std_pred = np.mean(preds), np.std(preds)
     mu_gold, std_gold = np.mean(gold), np.std(gold)
 
-    recalibrated = (preds - mu_pred) * (std_gold / std_pred) + mu_gold
+    if std_pred == 0:
+        return preds
 
+    recalibrated = (preds - mu_pred) * (std_gold / std_pred) + mu_gold
     return recalibrated
+
+
+
+def extract_num(s: str) -> int:
+    """Extracts the number from an ID string (e.g., '123' or 'id_123')."""
+    m = re.search(r"(\d+)$", str(s))
+    return int(m.group(1)) if m else -1
 
 
 def set_seed(seed: int):
@@ -289,30 +267,22 @@ def set_seed(seed: int):
     if torch.cuda.is_available():
         torch.cuda.manual_seed(seed)
         torch.cuda.manual_seed_all(seed)
-        # torch.backends.cudnn.deterministic = True
-        # torch.backends.cudnn.benchmark = False
+
 
 def log_results_to_csv(csv_path: str, results: dict):
     try:
         row_data = [
-            results['date'],
-            results['experiment'],
-            results['model'],
-            f"{results['pcc_v']:.4f}",
-            f"{results['pcc_a']:.4f}",
-            f"{results['rmse_va']:.4f}"
+            results.get('date', ''),
+            results.get('experiment', ''),
+            results.get('model', ''),
+            f"{results.get('pcc_v', 0):.4f}",
+            f"{results.get('pcc_a', 0):.4f}",
+            f"{results.get('rmse_va', 0):.4f}"
         ]
 
         with open(csv_path, 'a', newline='', encoding='utf-8') as f:
             writer = csv.writer(f)
-
-
             writer.writerow(row_data)
-
-        print(f"successfully appended results to {csv_path}.")
-
-    except IOError as e:
-        print(f"error appending results to {csv_path}: {e}")
-
-    except KeyError as e:
-        print(f"ERROR: the key {e} could not be found, nothing has been appended.")
+        print(f"Results appended to {csv_path}.")
+    except Exception as e:
+        print(f"Error logging to CSV: {e}")

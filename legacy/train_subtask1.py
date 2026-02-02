@@ -117,7 +117,7 @@ def main(input: str):
     print("--------------------------")
 
     print("Running predictions on the test set...")
-    pred_v, pred_a = utils.get_ldl_predictions(model, predict_loader, device, type="pred")
+    pred_v, pred_a = utils.get_ldl_predictions(model, predict_loader, device, type="download")
 
     predict_df["Valence"] = pred_v
     predict_df["Arousal"] = pred_a

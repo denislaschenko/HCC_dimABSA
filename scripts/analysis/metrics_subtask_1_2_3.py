@@ -5,7 +5,7 @@ import math
 import argparse
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-p', '--pred_data_path', type=str, required=True, help='Path to the pred data file.')
+parser.add_argument('-p', '--pred_data_path', type=str, required=True, help='Path to the download data file.')
 parser.add_argument('-g', '--gold_data_path', type=str, required=True, help='Path to the gold data file.')
 parser.add_argument('-t', '--task', type=int, choices=[1,2,3], required=True, help='Taks name include 1, 2, or 3.')
 parser.add_argument('--do_norm', action='store_true')
@@ -14,13 +14,13 @@ args = parser.parse_args()
 
 key_name ={1:"Aspect_VA", 2:"Triplet", 3:'Quadruplet'}
 
-def read_jsonl_file(file_path, task = 3, data_type = 'pred'):
+def read_jsonl_file(file_path, task = 3, data_type = 'download'):
     """
     Reads a JSONL file from the specified path and processes each line.
 
     Args:
         file_path (str): The path to the JSONL file.
-        type (str): pred or gold.
+        type (str): download or gold.
 
     Returns:
         list: A list of dictionaries containing all successfully parsed lines. 
@@ -230,7 +230,7 @@ def evaluate_predictions(gold_data, pred_data, task = 3):
                     # print("======================="*5)
                     # print("id: ",id_)
                     # print("gold: ",gold_quad)
-                    # print("pred: ",pred_quad)
+                    # print("download: ",pred_quad)
                     # print(pred_v - gold_v,pred_a - gold_a)
                     # print("dist:   ",va_euclid)
                     # print("cTP_t: ", cTP_t)

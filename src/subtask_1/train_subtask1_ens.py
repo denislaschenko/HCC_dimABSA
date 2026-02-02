@@ -8,19 +8,16 @@ from transformers import AutoTokenizer, get_linear_schedule_with_warmup
 from torch.optim import AdamW
 from sklearn.model_selection import train_test_split
 from torch.amp import GradScaler
-
-project_root = os.path.abspath(os.path.dirname(__file__))
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
-
 from src.shared import utils, config
 from src.shared.dataset import VADataset
 from src.shared.model import TransformerVARegressor
 from scripts.vis.generate_results_plot import generate_plot
 
-os.environ["TOKENIZERS_PARALLELISM"] = "false"
+project_root = os.path.abspath(os.path.dirname(__file__))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
-# Neue Konfiguration für das Ensembling
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 ENSEMBLE_SEEDS = [100, 42, 2026]
 
 
@@ -48,15 +45,13 @@ def train_single_seed(seed, input_file):
     Exakt die Logik deiner alten main(), aber parametrisiert mit seed.
     Gibt die Predictions zurück, statt sie direkt zu speichern.
     """
-    # 1. Seed setzen
     utils.set_seed(seed)
     print(f"\n--- Starting run with SEED {seed} ---")
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
     model = TransformerVARegressor(model_name=config.MODEL_NAME, num_bins=config.NUM_BINS).to(device)
-
     emb_weight = model.backbone.embeddings.word_embeddings.weight
+
     if torch.isnan(emb_weight).any():
         print("CRITICAL ERROR: Weights corrupted IMMEDIATELY after .to(device)!")
         return None
@@ -160,8 +155,9 @@ def train_single_seed(seed, input_file):
         print("Skipping evaluation for this seed.")
         return None
 
+# TODO: check where the gold set came from
     pred_v_dev, pred_a_dev, gold_v_dev, gold_a_dev = utils.get_ldl_predictions(model, dev_loader, device, type="dev")
-    pred_v_test, pred_a_test = utils.get_ldl_predictions(model, predict_loader, device, type="pred")
+    pred_v_test, pred_a_test = utils.get_ldl_predictions(model, predict_loader, device, type="download")
 
     single_seed_score = utils.evaluate_predictions_task1(pred_a_dev, pred_v_dev, gold_a_dev, gold_v_dev)
 
@@ -239,7 +235,7 @@ def predict_va_for_subtask2(triplets_data: list, model_dir=None):
         model.eval()
 
         # Get predictions for this single model
-        v, a = utils.get_ldl_predictions(model, dataloader, device, type="pred")
+        v, a = utils.get_ldl_predictions(model, dataloader, device, type="download")
         all_pred_v.append(v)
         all_pred_a.append(a)
         models_found += 1
