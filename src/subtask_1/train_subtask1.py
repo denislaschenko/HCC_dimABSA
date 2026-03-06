@@ -19,8 +19,8 @@ if project_root not in sys.path:
 
 # TODO: switch clean paths
 from src.shared import utils_clean, config
-from src.shared.dataset_clean import VADataset
-from src.shared.model_clean import TransformerVARegressor
+from src.shared.dataset import VADataset
+from src.shared.model import TransformerVARegressor
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 

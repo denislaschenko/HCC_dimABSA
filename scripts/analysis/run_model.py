@@ -3,9 +3,10 @@ import torch
 from torch.utils.data import DataLoader
 from transformers import AutoTokenizer
 
-from src.shared import utils, config
-from src.shared.dataset import VADataset
-from src.shared.model import TransformerVARegressor
+from src.shared import config
+from legacy import utils
+from legacy.dataset import VADataset
+from legacy.model import TransformerVARegressor
 
 model_name = config.MODEL_NAME
 dropout = 0.1

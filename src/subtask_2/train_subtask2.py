@@ -13,7 +13,7 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 from src.shared import config
-import src.subtask_2.inference_clean as inference
+import src.subtask_2.inference as inference
 
 INSTRUCTION = """Given a textual instance [Text], extract all (A, O, VA) triplets, where:
 - A is an Aspect term (a phrase describing an entity mentioned in [Text])

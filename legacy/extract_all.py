@@ -1,18 +1,15 @@
-import argparse
 import json
 import os
 import sys
 import time
 
 import numpy as np
-import pandas as pd
 import torch
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.preprocessing import LabelEncoder
 from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
 from transformers import AutoModel, AutoTokenizer
-from unicodedata import category
 
 from src.shared.config import OUTPUT_FILE
 
@@ -20,8 +17,9 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from src.shared import config, utils
-from src.subtask_2 import SFT_Slop2
+from src.shared import config
+from legacy import utils
+
 
 def load_training_data(filepath):
     data = []

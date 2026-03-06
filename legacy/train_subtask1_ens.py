@@ -8,9 +8,10 @@ from transformers import AutoTokenizer, get_linear_schedule_with_warmup
 from torch.optim import AdamW
 from sklearn.model_selection import train_test_split
 from torch.amp import GradScaler
-from src.shared import utils, config
-from src.shared.dataset import VADataset
-from src.shared.model import TransformerVARegressor
+from src.shared import config
+from legacy import utils
+from legacy.dataset import VADataset
+from legacy.model import TransformerVARegressor
 from scripts.vis.generate_results_plot import generate_plot
 
 project_root = os.path.abspath(os.path.dirname(__file__))

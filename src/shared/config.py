@@ -26,7 +26,7 @@ TASK_CONFIGS = {
         "TASK": "task3",
         "INCLUDE_OPINION": True,
         "INCLUDE_CATEGORY": True,
-        "MODEL_NAME": "princeton-nlp/sup-simcse-roberta-large",
+        "MODEL_NAME": "roberta-base", # "princeton-nlp/sup-simcse-roberta-large",
         "PATIENCE": 2,
         "RAG_K": 3
     }
@@ -39,9 +39,9 @@ MODEL_VERSION_ID = "v1.4"
 
 # Training settings
 SEED = 100
-LEARNING_RATE = 1e-5 # switched from 2e-5
-EPOCHS = 20
-BATCH_SIZE = 128 # switched from 8
+LEARNING_RATE = 3e-5 # switched from 1e-5
+EPOCHS = 5 #20
+BATCH_SIZE = 16 # switched from 128
 MAX_LEN = 128
 PATIENCE = 3
 NUM_BINS = 9
@@ -65,7 +65,7 @@ DATA_DIR = os.path.join(PROJECT_ROOT, DATA_ROOT, TRACK, ACTIVE_SUBTASK, LANG)
 FIGURE_DIR = os.path.join(PROJECT_ROOT, "outputs/subtask_1/figures")
 CSV_FILE = os.path.join(PROJECT_ROOT, "outputs/subtask_1/logs/results.csv")
 
-TRAIN_FILE = os.path.join(PROJECT_ROOT, DATA_ROOT, TRACK, ACTIVE_SUBTASK, LANG, f"{LANG}_{DOMAIN}_train_FULL.jsonl")
+TRAIN_FILE = os.path.join(PROJECT_ROOT, DATA_ROOT, TRACK, ACTIVE_SUBTASK, LANG, f"{LANG}_{DOMAIN}_train_alltasks.jsonl")
 # TRAIN_FILE = os.path.join(PROJECT_ROOT, DATA_ROOT, TRACK, ACTIVE_SUBTASK, LANG, f"{LANG}_{DOMAIN}_train_SMALL.jsonl")
 PREDICT_FILE = os.path.join(DATA_DIR, f"{LANG}_{DOMAIN}_test_{current_config.get('TASK')}.jsonl")
 

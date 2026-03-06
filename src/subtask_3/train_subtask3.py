@@ -20,7 +20,7 @@ if project_root not in sys.path:
 from src.shared import config, utils_clean
 
 try:
-    import src.subtask_2.inference_clean as subtask2_inference
+    import src.subtask_2.inference as subtask2_inference
 except ImportError:
     print("Error: Could not import src.subtask_2.inference. Make sure the file exists.")
     sys.exit(1)
@@ -195,23 +195,25 @@ def main():
     print(f"Model: {model_name}")
     print(f"Device: {'cuda' if torch.cuda.is_available() else 'cpu'}")
 
-    print("\n[Step 1/4] Running Subtask 2 Inference (Aspect, Opinion, VA)...")
-    if os.path.exists(subtask2_pred_file):
-        print(f"Found existing predictions at {subtask2_pred_file}. Skipping LLM Inference.")
+    # print("\n[Step 1/4] Running Subtask 2 Inference (Aspect, Opinion, VA)...")
+    # if os.path.exists(subtask2_pred_file):
+    #     print(f"Found existing predictions at {subtask2_pred_file}. Skipping LLM Inference.")
+    #
+    # elif os.path.exists(adapter_path):
+    #     subtask2_inference.run_inference(
+    #         checkpoint_path=adapter_path,
+    #         input_file=config.PREDICT_FILE,
+    #         output_file=subtask2_pred_file,
+    #         base_model_id="unsloth/Qwen2.5-7B-Instruct-bnb-4bit"
+    #     )
+    # else:
+    #     print(f"CRITICAL WARNING: Adapter not found at {adapter_path}")
+    #     print("Cannot run Subtask 2. Assuming `pred_eng_laptop.jsonl` already exists in subtask_2/predictions.")
+    #     if not os.path.exists(subtask2_pred_file):
+    #         print("Error: Intermediate predictions missing. Aborting.")
+    #         return
 
-    elif os.path.exists(adapter_path):
-        subtask2_inference.run_inference(
-            checkpoint_path=adapter_path,
-            input_file=config.PREDICT_FILE,
-            output_file=subtask2_pred_file,
-            base_model_id="unsloth/Qwen2.5-7B-Instruct-bnb-4bit"
-        )
-    else:
-        print(f"CRITICAL WARNING: Adapter not found at {adapter_path}")
-        print("Cannot run Subtask 2. Assuming `pred_eng_laptop.jsonl` already exists in subtask_2/predictions.")
-        if not os.path.exists(subtask2_pred_file):
-            print("Error: Intermediate predictions missing. Aborting.")
-            return
+    pass
 
     print("\n[Step 2/4] Training Contrastive Encoder on Categories...")
 
@@ -228,7 +230,7 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     train_dataset = CategoryDataset(train_data, tokenizer, config.MAX_LEN, label_encoder, is_inference=False)
 
-    sampler = PKSampler(train_dataset)
+    sampler = PKSampler(train_dataset, p=4, k=4)
     train_loader = DataLoader(
         train_dataset,
         batch_size=config.BATCH_SIZE,
@@ -266,6 +268,14 @@ def main():
             optimizer.step()
             total_loss += loss.item()
         print(f"  Epoch {epoch + 1} Loss: {total_loss / len(train_loader):.4f}")
+
+        # remove later until step 3
+
+    print(f"Saving trained model to {config.MODEL_SAVE_PATH}...")
+    os.makedirs(os.path.dirname(config.MODEL_SAVE_PATH), exist_ok=True)
+    torch.save(model.backbone.state_dict(), config.MODEL_SAVE_PATH)
+    print("Model saved successfully. Exiting for visualization.")
+    return
 
     print("\n[Step 3/4] Building Class prototypes...")
     model.eval()

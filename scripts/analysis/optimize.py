@@ -9,7 +9,8 @@ if project_root not in sys.path:
 
 try:
     from legacy.train_subtask1 import main as run_training_trial
-    from src.shared import utils, config
+    from src.shared import config
+    from legacy import utils
     from scripts.vis import generate_plot
 except ImportError as e:
     print(
