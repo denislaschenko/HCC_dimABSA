@@ -1,19 +1,33 @@
 # HCC_dimABSA
 Exploring Aspect-based sentiment analysis with continuous emotion scores (Valence &amp; Arousal) – Bachelor-level implementation of SemEval2026.
 
-## Model Performance Progress
+## System Architecture
+Our system utilizes a modular cascading pipeline, specifically separating continuous regression from generative extraction to avoid LLM numerical hallucinations:
 
-This chart shows the performance improvement on the **dev set** over time.
+1. **Dimensional Regression (DimASR):** Utilizes `roberta-large` trained with a custom Label Distribution Learning (LDL) and Concordance Correlation Coefficient (CCC) objective.
+2. **Generative Extraction (DimASTE):** Instruction-tuning of **`Qwen2.5-7B-Instruct`** using **QLoRA** (4-bit quantization). We employ **Retrieval-Augmented In-Context Learning (RAG-ICL)** via `BAAI/bge-base-en-v1.5` to provide dynamic few-shot prompting and ensure structured outputs.
+3. **Metric Categorization (DimASQP):** Supervised Contrastive Learning (SupCon) using `sup-simcse-roberta-large` with nearest-centroid inference.
 
-![Model Performance Progress](outputs/subtask_1/figures/performance_plot.png)
-*Note: All experiments are run with a global random seed of 42 to ensure fair and reproducible comparisons.*
+**Core Tech Stack:** `PyTorch`, `transformers`, `peft` (LoRA), `bitsandbytes`, `sentence-transformers`.
 
-## Experiment Log & Results
+## Official Model Performance (Subtask 1: DimASR)
 
-This table tracks the performance of each model version on the **dev set**.
+The following table reports the official regression performance across domains using our `roberta-large` LDL implementation:
 
-| Date | Experiment | Model | PCC_V (↑) | PCC_A (↑) | RMSE_VA (↓) | Notes |
-| :--- | :--- | :--- | :---: | :---: | :---: | :--- |
-| 24.10.25 | v1.0 | `bert-base-multilingual-cased` | 0.581 | 0.435 | 2.216 | Initial run. |
-| 04.11.25 | v1.1 | `bert-base-multilingual-cased` | **0.809** | **0.640** | **1.381** | **Fixed tokenizer mismatch.** |
-| 09.11.25 | v1.2 | `bert-base-multilingual-cased` | **0.8119** | **0.6567** | **1.5626** | **Implemented early stopping mechanism.** |
+| Domain | PCC_Valence (↑) | PCC_Arousal (↑) | RMSE_VA (↓) |
+| :--- | :--- | :--- | :--- |
+| **Laptop** | 0.8531 | 0.5379 | 1.2942 |
+| **Restaurant** | 0.8870 | 0.6462 | 1.3011 |
+
+*Note: The model significantly outperformed the 120B GPT-OSS baseline provided by the shared task organizers.*
+
+## Quickstart & Requirements
+
+Ensure you have a GPU with sufficient VRAM for 4-bit LLM inference.
+
+```bash
+# Core dependencies
+pip install torch transformers peft bitsandbytes sentence-transformers pandas scikit-learn
+
+# Run the pipeline (Subtask 1)
+bash run_domains.sh
