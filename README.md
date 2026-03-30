@@ -10,16 +10,35 @@ Our system utilizes a modular cascading pipeline, specifically separating contin
 
 **Core Tech Stack:** `PyTorch`, `transformers`, `peft` (LoRA), `bitsandbytes`, `sentence-transformers`.
 
-## Official Model Performance (Subtask 1: DimASR)
+## Official Model Performance (SemEval-2026 Task 3)
 
-The following table reports the official regression performance across domains using our `roberta-large` LDL implementation:
+We evaluate our modular pipeline across all three DimABSA subtasks on the official CodaBench metrics. We compare our resource-efficient approach (RoBERTa-Large + Qwen-7B) against massive LLM baselines provided by the task organizers.
 
-| Domain | PCC_Valence (↑) | PCC_Arousal (↑) | RMSE_VA (↓) |
-| :--- | :--- | :--- | :--- |
-| **Laptop** | 0.8531 | 0.5379 | 1.2942 |
-| **Restaurant** | 0.8870 | 0.6462 | 1.3011 |
+### Subtask 1: Dimensional Aspect Sentiment Regression (DimASR)
+[cite_start]*Metric: Joint Root Mean Square Error (RMSE_VA) - Lower is better.* [cite: 313, 317]
 
-*Note: The model significantly outperformed the 120B GPT-OSS baseline provided by the shared task organizers.*
+| Domain | Our Model (RoBERTa LDL) | Baseline (GPT-OSS 120B) |
+| :--- | :--- | :--- |
+| **Laptop** | **1.2942** [cite: 316] | 1.5269 [cite: 320] |
+| **Restaurant** | **1.3011** [cite: 316] | 1.4605 [cite: 320] |
+
+### Subtask 2: Dimensional Aspect Sentiment Triplet Extraction (DimASTE)
+*Metric: Continuous F1 (cF1) - Higher is better.* [cite: 313, 319]
+
+| Domain | Our Model (Qwen-7B + RAG) | Baseline (GPT-OSS 120B) |
+| :--- | :--- | :--- |
+| **Laptop** | **0.5635** [cite: 318] | 0.4515 [cite: 323] |
+| **Restaurant** | **0.6326** [cite: 318] | 0.5442 [cite: 323] |
+
+### Subtask 3: Dimensional Aspect Sentiment Quad Prediction (DimASQP)
+*Metric: Continuous F1 (cF1) - Higher is better.* [cite: 313, 319]
+
+| Domain | Our Model (SupCon + Centroid) | Baseline (Llama-3.3 70B) |
+| :--- | :--- | :--- |
+| **Laptop** | **0.2512** [cite: 318] | 0.2483 [cite: 326] |
+| **Restaurant** | **0.5612** [cite: 318] | 0.5048 [cite: 327] |
+
+*Conclusion: Our decoupled architecture using targeted 7B-parameter models successfully rivals and outperforms 70B-120B brute-force baselines across extraction and regression tasks.* [cite: 329, 330, 341]
 
 ## Quickstart & Requirements
 
