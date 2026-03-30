@@ -15,30 +15,30 @@ Our system utilizes a modular cascading pipeline, specifically separating contin
 We evaluate our modular pipeline across all three DimABSA subtasks on the official CodaBench metrics. We compare our resource-efficient approach (RoBERTa-Large + Qwen-7B) against massive LLM baselines provided by the task organizers.
 
 ### Subtask 1: Dimensional Aspect Sentiment Regression (DimASR)
-[cite_start]*Metric: Joint Root Mean Square Error (RMSE_VA) - Lower is better.* [cite: 313, 317]
+[cite_start]*Metric: Joint Root Mean Square Error (RMSE_VA) - Lower is better.*
 
 | Domain | Our Model (RoBERTa LDL) | Baseline (GPT-OSS 120B) |
 | :--- | :--- | :--- |
-| **Laptop** | **1.2942** [cite: 316] | 1.5269 [cite: 320] |
-| **Restaurant** | **1.3011** [cite: 316] | 1.4605 [cite: 320] |
+| **Laptop** | **1.2942** | 1.5269 |
+| **Restaurant** | **1.3011** | 1.4605 |
 
 ### Subtask 2: Dimensional Aspect Sentiment Triplet Extraction (DimASTE)
-*Metric: Continuous F1 (cF1) - Higher is better.* [cite: 313, 319]
+*Metric: Continuous F1 (cF1) - Higher is better.* 
 
 | Domain | Our Model (Qwen-7B + RAG) | Baseline (GPT-OSS 120B) |
 | :--- | :--- | :--- |
-| **Laptop** | **0.5635** [cite: 318] | 0.4515 [cite: 323] |
-| **Restaurant** | **0.6326** [cite: 318] | 0.5442 [cite: 323] |
+| **Laptop** | **0.5635**  | 0.4515 |
+| **Restaurant** | **0.6326**  | 0.5442 |
 
 ### Subtask 3: Dimensional Aspect Sentiment Quad Prediction (DimASQP)
-*Metric: Continuous F1 (cF1) - Higher is better.* [cite: 313, 319]
+*Metric: Continuous F1 (cF1) - Higher is better.*
 
 | Domain | Our Model (SupCon + Centroid) | Baseline (Llama-3.3 70B) |
 | :--- | :--- | :--- |
-| **Laptop** | **0.2512** [cite: 318] | 0.2483 [cite: 326] |
-| **Restaurant** | **0.5612** [cite: 318] | 0.5048 [cite: 327] |
+| **Laptop** | **0.2512** | 0.2483 |
+| **Restaurant** | **0.5612** | 0.5048 |
 
-*Conclusion: Our decoupled architecture using targeted 7B-parameter models successfully rivals and outperforms 70B-120B brute-force baselines across extraction and regression tasks.* [cite: 329, 330, 341]
+*Conclusion: Our decoupled architecture using targeted 7B-parameter models successfully rivals and outperforms 70B-120B brute-force baselines across extraction and regression tasks.*
 
 ## Quickstart & Requirements
 
@@ -48,5 +48,10 @@ Ensure you have a GPU with sufficient VRAM for 4-bit LLM inference.
 # Core dependencies
 pip install torch transformers peft bitsandbytes sentence-transformers pandas scikit-learn
 
-# Run the pipeline (Subtask 1)
-bash run_domains.sh
+# Example: Run Subtask 1 (DimASR) after setting domain="restaurant" in config
+python scripts/run_subtask_1.py
+
+# Example: Run Subtask 2 (DimASTE) Extraction
+python scripts/run_subtask_2.py
+```
+*Note: The script run_domains.sh is provided as a convenience shortcut to sequentially execute Subtask 3 batch processing across all domains.*
