@@ -1,5 +1,5 @@
 # HCC_dimABSA
-Exploring Aspect-based sentiment analysis with continuous emotion scores (Valence &amp; Arousal) – Bachelor-level implementation of SemEval2026.
+Exploring Aspect-based sentiment analysis with continuous emotion scores (Valence &amp; Arousal), a Bachelor-level implementation of SemEval2026.
 
 ## System Architecture
 Our system utilizes a modular cascading pipeline, specifically separating continuous regression from generative extraction to avoid LLM numerical hallucinations:
